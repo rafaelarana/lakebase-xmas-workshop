@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Planificador — Taller de Navidad</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="/static/navidad-fx.css" />
+<style>
+  :root { font-family: system-ui, sans-serif; color: #1f2933; --bg: #f5f3ef; --panel: #fff; --line: #e3ded6;
+          --red: #d92d20; --amber: #f79009; --green: #12b76a; --blue: #2e90fa; --muted: #6b7280; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); }
+  .navidad-header a { margin-left: 0.75rem; font-size: 0.85rem; color: var(--muted); }
+  .navidad-header .links { margin-left: auto; white-space: nowrap; }
+  .main { display: grid; grid-template-columns: 320px minmax(0, 1fr) 380px; gap: 0.75rem; padding: 0.25rem 1.5rem 1.5rem; }
+  .ctl h2 small { color: var(--muted); font-weight: 500; }
+  .ctl { overflow-x: hidden; }
+  .selrow select#city { flex-grow: 1.4; }
+  .param { margin: 0.55rem 0 0.8rem; }
+  .param label { display: flex; justify-content: space-between; font-weight: 600; font-size: 0.84rem; }
+  .param label b { font-variant-numeric: tabular-nums; }
+  .param input[type=range] { width: 100%; accent-color: #1f2933; margin: 0.35rem 0 0.1rem; }
+  .param small { color: var(--muted); font-size: 0.75rem; line-height: 1.3; display: block; }
+  .sc.dis { opacity: 0.45; cursor: not-allowed; }
+  .sc.none p { margin-top: 0.15rem; }
+  .selrow { display: flex; gap: 0.4rem; margin: 0.45rem 0 0.2rem; }
+  .selrow select { flex: 1 1 0; min-width: 0; width: 100%; padding: 0.35rem 0.4rem; border: 1px solid var(--line); border-radius: 7px; background: #fff; font-size: 0.85rem; }
+  .applied { font-size: 0.78rem; color: #4b5563; background: #f7f5f1; border: 1px solid var(--line); border-radius: 8px; padding: 0.35rem 0.55rem; margin-top: 0.4rem; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  #map { height: calc(100vh - 6rem); min-height: 560px; }
+  .muted-tiles { filter: saturate(0.25) brightness(1.06) contrast(0.9); }
+  .side { padding: 0.9rem 1rem; font-size: 0.86rem; overflow: auto; max-height: calc(100vh - 6rem); }
+  .side h2 { font-size: 0.95rem; margin: 0.9rem 0 0.5rem; }
+  .side h2:first-child { margin-top: 0; }
+  .sc { border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem 0.7rem; margin-bottom: 0.55rem; cursor: pointer; }
+  .sc:hover { border-color: #c9c2b8; }
+  .sc.on { border-color: var(--red); box-shadow: 0 0 0 2px #d92d2022; }
+  .sc .t { font-weight: 650; display: flex; justify-content: space-between; gap: 0.5rem; }
+  .sc .t small { color: var(--muted); font-weight: 500; }
+  .sc p { margin: 0.3rem 0 0; color: #4b5563; font-size: 0.8rem; line-height: 1.35; }
+  button.primary { background: #1f2933; color: #fff; border: 0; border-radius: 8px; padding: 0.5rem 0.8rem; cursor: pointer; font-size: 0.86rem; }
+  button.ghost { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 0.45rem 0.7rem; cursor: pointer; font-size: 0.82rem; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+  .branch { display: inline-flex; align-items: center; gap: 0.35rem; font-family: ui-monospace, monospace; font-size: 0.78rem;
+            background: #fff4ed; color: #b93815; border: 1px solid #fdd6bd; border-radius: 999px; padding: 0.15rem 0.55rem; }
+  .phases { list-style: none; padding: 0; margin: 0.5rem 0; display: grid; gap: 0.2rem; }
+  .phases li { display: flex; justify-content: space-between; color: var(--muted); }
+  .phases li.done { color: #1f2933; } .phases li.running { color: var(--blue); font-weight: 600; } .phases li.error { color: var(--red); }
+  .cmp { width: 100%; border-collapse: collapse; margin-top: 0.3rem; }
+  .cmp th, .cmp td { padding: 0.3rem 0.35rem; border-bottom: 1px solid var(--line); text-align: right; }
+  .cmp th:first-child, .cmp td:first-child { text-align: left; color: var(--muted); font-weight: 500; }
+  .cmp td.sim { font-weight: 650; }
+  .bar { height: 8px; border-radius: 4px; background: #eef0f2; overflow: hidden; margin-top: 0.15rem; }
+  .bar > span { display: block; height: 100%; background: var(--red); }
+  .sug { border-left: 3px solid var(--line); padding: 0.25rem 0 0.25rem 0.6rem; margin: 0.45rem 0; }
+  .sug b { display: block; }
+  .sug small { color: var(--muted); }
+  .sug.desvio { border-color: var(--green); } .sug.recogida { border-color: var(--blue); }
+  .sug.refuerzo { border-color: var(--amber); } .sug.tsp { border-color: #7a5af8; } .sug.ninos { border-color: #ee46bc; }
+  .note { color: var(--muted); font-size: 0.75rem; margin-top: 0.6rem; line-height: 1.35; }
+  .err { color: var(--red); white-space: pre-wrap; }
+  .legend { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.5rem; align-items: center; font-size: 0.78rem; margin-top: 0.4rem; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .zone-label { background: #fff; border: 1px solid var(--red); color: var(--red); font-weight: 600; font-size: 0.75rem;
+                padding: 1px 6px; border-radius: 6px; box-shadow: none; }
+  .minutes button.on { background: #1f2933; color: #fff; }
+  @media (max-width: 1400px) { .main { grid-template-columns: 300px minmax(0, 1fr); } .results-col { grid-column: 1 / -1; max-height: none; } }
+  @media (max-width: 1000px) { .main { grid-template-columns: 1fr; } #map { height: 60vh; } }
+</style>
+<link rel="stylesheet" href="/static/nav.css" />
+</head>
+<body>
+<script src="/static/nav.js"></script>
+<header class="navidad-header" data-navidad-header style="margin: 0.75rem 1.5rem 0.5rem">
+  <span class="navidad-brand">
+    <span class="navidad-logo" data-navidad-logo><img src="/static/databricks-symbol.svg" alt="Databricks" /></span>
+    <h1>Planificador</h1>
+  </span>
+  <span class="sub" style="color:#6b7280;font-size:.85rem">Parámetros de la noche + escenarios what-if · simulación en rama Lakebase · pgRouting</span>
+</header>
+
+<div class="main">
+  <div class="panel side ctl">
+    <h2>1 · Ciudad y noche</h2>
+    <div class="selrow">
+      <select id="city" aria-label="Ciudad"><option>Cargando…</option></select>
+      <select id="night" aria-label="Noche"><option value="nochebuena">Nochebuena</option><option value="reyes">Reyes</option></select>
+    </div>
+    <small class="note" id="cityNote" style="display:block;margin:0 0 .4rem"></small>
+
+    <h2>2 · Parámetros de la noche</h2>
+    <div class="param">
+      <label for="helpers">Ayudantes extra por ruta <b id="hVal">+0</b></label>
+      <input type="range" id="helpers" min="0" max="4" step="1" value="0" />
+      <small id="hHint">duendes en Nochebuena · pajes en Reyes · cada uno rinde ≈ 60 % de un portador</small>
+    </div>
+    <div class="param">
+      <label for="boost"><span>Impulso de <span id="bWho">renos</span></span> <b id="bVal">×1,00</b></label>
+      <input type="range" id="boost" min="1" max="1.5" step="0.05" value="1" />
+      <small id="bHint">acelera solo el trayecto entre paradas, no el tiempo en cada casa</small>
+    </div>
+    <button class="ghost" id="replan" disabled title="Recalcula rutas y sugerencias en la rama actual, sin volver a simular">Recalcular en la rama</button>
+    <div class="applied" id="paramsUsed" style="display:none"></div>
+
+    <h2>3 · Escenario what-if <small>(opcional)</small></h2>
+    <div id="scenarios"><p class="note">Cargando escenarios…</p></div>
+    <div class="row"><button class="primary" id="run" disabled>Simular</button>
+      <span class="note" id="runNote" style="margin:0"></span></div>
+  </div>
+  <div class="panel"><div id="map"></div></div>
+  <div class="panel side results-col">
+    <p class="note" id="emptyNote" style="margin-top:0">Elige ciudad, noche y parámetros y pulsa <b>Simular</b>. Sin escenario es un plan de solo lectura; con un escenario what-if, la simulación corre en una rama copy-on-write de Lakebase y producción no se toca.</p>
+    <div id="planBox" style="display:none">
+      <h2>Plan de la noche · sin incidencias</h2>
+      <p class="note" style="margin:.1rem 0 .5rem">Solo lectura sobre <code>production</code> (sin rama): ninguna ruta llega tarde, los parámetros adelantan el final de la noche.</p>
+      <table class="cmp" id="planCmp"></table>
+      <div id="planRoutes"></div>
+    </div>
+    <div id="simBox" style="display:none">
+      <h2>Rama de simulación</h2>
+      <div class="row"><span class="branch" id="branch"></span><small class="note" style="margin:0">copy-on-write · TTL 24 h</small></div>
+      <ul class="phases" id="phases"></ul>
+      <div id="replay" style="display:none">
+        <div class="note" style="margin:.2rem 0 .3rem">Minuto de la noche (los cortes aparecen poco a poco):</div>
+        <div class="row minutes" id="minutes"></div>
+      </div>
+      <div class="err" id="err"></div>
+
+      <div id="results" style="display:none">
+        <h2>Producción vs rama</h2>
+        <table class="cmp" id="cmp"></table>
+        <div id="routes"></div>
+        <h2>Sugerencias (pgRouting)</h2>
+        <div id="sugs"></div>
+        <div class="row" style="margin-top:.7rem">
+          <button class="primary" id="apply">Aplicar plan a producción</button>
+          <button class="ghost" id="discard">Descartar rama</button>
+        </div>
+        <div class="note" id="applyNote"></div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span style="width:14px;height:10px;background:#d92d2040;border:1.5px solid var(--red);display:inline-block"></span><span>Zona de incidencia</span>
+      <span class="dot" style="background:#7a271a"></span><span>Hogar sin acceso</span>
+      <span class="dot" style="background:var(--amber)"></span><span>Tramo con desvío</span>
+      <span class="dot" style="background:#fec84b"></span><span>Tramo más lento</span>
+      <span style="width:14px;height:3px;background:var(--green);display:inline-block"></span><span>Desvío sugerido</span>
+      <span class="dot" style="background:var(--blue)"></span><span>Punto de recogida</span>
+    </div>
+    <p class="note">Escenarios <b>inspirados en</b> hechos reales (borrasca Filomena 2021, DANA 2024); la geometría es ilustrativa.
+      Los tiempos son de viaje por carretera + parada, no los horarios comprimidos del dataset. Cifras de tramos sobre una muestra
+      determinista. Callejero © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> (ODbL).</p>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const nf = new Intl.NumberFormat("es-ES");
+const fmt = (v) => (v === null || v === undefined ? "—" : typeof v === "number" ? nf.format(v) : v);
+const BRINGER = { papa_noel: "Papá Noel", olentzero: "Olentzero", tio: "Tió de Nadal", apalpador: "Apalpador",
+                  melchor: "Melchor", gaspar: "Gaspar", baltasar: "Baltasar" };
+const PHASE = { rama: "Crear rama (copy-on-write)", computo: "Arrancar cómputo de la rama", incidencia: "Aplicar incidencia",
+                rutas: "Rutas con pgRouting", parametros: "Aplicar parámetros (ayudantes, impulso)", sugerencias: "Sugerencias", mapa: "Preparar mapa" };
+const nf2 = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const params = () => ({ helpers: +document.getElementById("helpers").value, boost: +document.getElementById("boost").value });
+function campaignOf(id) { const sc = scenarios.find((x) => x.scenario_id === id); return sc ? sc.campaign : "nochebuena"; }
+function renderParams() {
+  const p = params(), reyes = selected ? campaignOf(selected) === "reyes" : document.getElementById("night").value === "reyes";
+  document.getElementById("hVal").textContent = `+${p.helpers} ${reyes ? "pajes" : "duendes"}`;
+  document.getElementById("bWho").textContent = reyes ? "camellos" : "renos";
+  document.getElementById("bVal").textContent = `×${nf2.format(p.boost)}`;
+  const k = current && current.kpi, tf = k && k.params ? Math.round(k.params.travel_share * 100) : null;
+  document.getElementById("bHint").textContent = `acelera solo el trayecto entre paradas${tf !== null ? ` (≈ ${tf} % del tiempo de esta noche)` : ""}, no el tiempo en cada casa`;
+  const changed = current && current.status === "done" && (p.helpers !== (current.helpers || 0) || Math.abs(p.boost - (current.boost || 1)) > 1e-6);
+  document.getElementById("replan").disabled = !changed;
+}
+const STOP_COLOR = { inaccesible: "#7a271a", sin_ruta: "#b42318", desvio: "#f79009", lento: "#fec84b", sin_evaluar: "#d0d5dd" };
+
+const map = L.map("map", { preferCanvas: true }).setView([40.2, -2.5], 6);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 18, className: "muted-tiles", attribution: "© OpenStreetMap contributors" }).addTo(map);
+const layers = { zones: L.layerGroup().addTo(map), stops: L.layerGroup().addTo(map), sugs: L.layerGroup().addTo(map) };
+
+let scenarios = [], selected = null, current = null, poll = null;
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  const ct = res.headers.get("content-type") || "";
+  const body = ct.includes("json") ? await res.json() : await res.text();
+  if (!res.ok) throw new Error(typeof body === "string" ? body : body.detail || JSON.stringify(body));
+  return body;
+}
+
+function drawZones(features, minute) {
+  layers.zones.clearLayers();
+  const fc = { type: "FeatureCollection", features: features || [] };
+  const g = L.geoJSON(fc, {
+    style: (f) => {
+      const p = f.properties, hidden = minute !== undefined && p.appears_at_min > minute;
+      return { color: "#d92d20", weight: p.closed ? 2 : 1.2, dashArray: p.main_only ? "6 4" : p.closed ? null : "2 4",
+               fillColor: "#d92d20", fillOpacity: hidden ? 0.04 : p.closed ? 0.28 : 0.12, opacity: hidden ? 0.3 : 0.9 };
+    },
+    onEachFeature: (f, l) => {
+      const p = f.properties;
+      const extra = p.closed ? (p.main_only ? "vías principales cerradas" : "cerrada al tráfico") : `×${p.factor_local} más lento`;
+      l.bindTooltip(`${p.label} · ${extra}${p.appears_at_min ? ` · min ${p.appears_at_min}` : ""}`,
+                    { permanent: p.closed && !p.main_only, direction: "top", className: "zone-label" });
+    },
+  }).addTo(layers.zones);
+  if (fc.features.length) map.fitBounds(g.getBounds(), { padding: [30, 30], maxZoom: 13 });
+}
+
+function drawSim(geo) {
+  layers.stops.clearLayers(); layers.sugs.clearLayers();
+  for (const [lon, lat, status, bringer] of geo.stops || []) {
+    L.circleMarker([lat, lon], { radius: status === "inaccesible" || status === "sin_ruta" ? 3.5 : 2.5, stroke: false,
+      fillColor: STOP_COLOR[status] || "#98a2b3", fillOpacity: 0.85 })
+      .bindTooltip(`${BRINGER[bringer] || bringer} · ${status.replace("_", " ")}`).addTo(layers.stops);
+  }
+  const pickups = new Map();
+  for (const f of geo.suggestions || []) {
+    const p = f.properties;
+    if (p.kind === "desvio") {
+      L.geoJSON(f, { style: { color: "#12b76a", weight: 4, opacity: 0.85 } })
+        .bindTooltip(`Desvío sugerido · +${p.extra_min} min`).addTo(layers.sugs);
+    } else if (p.kind === "punto_recogida" && f.geometry) {
+      const key = p.pickup_id ?? f.geometry.coordinates.join(",");
+      if (!pickups.has(key)) pickups.set(key, { c: f.geometry.coordinates, n: p.households_at_point || 1 });
+    }
+  }
+  for (const { c, n } of pickups.values()) {
+    L.circleMarker([c[1], c[0]], { radius: 4 + Math.min(10, Math.sqrt(n)), color: "#fff", weight: 1.5,
+      fillColor: "#2e90fa", fillOpacity: 0.95 }).bindTooltip(`Punto de recogida · ${fmt(n)} hogares`).addTo(layers.sugs);
+  }
+}
+
+function renderScenarios() {
+  const box = document.getElementById("scenarios");
+  const city = document.getElementById("city").value;
+  box.innerHTML = "";
+  const none = document.createElement("div");
+  none.className = "sc none" + (!selected ? " on" : "");
+  none.innerHTML = `<div class="t"><span>Ninguno · noche normal</span><small>${city || ""}</small></div><p>Plan de la noche sin incidencias (sin rama).</p>`;
+  none.onclick = () => { selected = null; layers.zones.clearLayers(); renderScenarios(); renderParams(); };
+  box.appendChild(none);
+  for (const s of scenarios) {
+    const d = document.createElement("div");
+    const usable = s.city === city;
+    d.className = "sc" + (selected === s.scenario_id ? " on" : "") + (usable ? "" : " dis");
+    const night = s.campaign === "reyes" ? `Reyes ${s.year + 1}` : `Nochebuena ${s.year}`;
+    d.innerHTML = `<div class="t"><span>${s.title}</span><small>${s.city} · ${night}</small></div>`
+      + (usable ? `<p>${s.story}</p>` : `<p>Elige ${s.city} para usarlo (hay red de carreteras en Madrid, Valencia y Barcelona).</p>`);
+    d.onclick = () => {
+      if (!usable) return;
+      selected = s.scenario_id; document.getElementById("night").value = s.campaign;
+      renderScenarios(); drawZones(s.zones); renderParams();
+    };
+    box.appendChild(d);
+  }
+  document.getElementById("run").disabled = !city || !!(current && current.status === "running" && selected);
+  document.getElementById("run").textContent = selected ? "Simular en rama" : "Simular (plan sin rama)";
+}
+
+function renderSim(s) {
+  current = s;
+  document.getElementById("simBox").style.display = "";
+  document.getElementById("planBox").style.display = "none";
+  document.getElementById("emptyNote").style.display = "none";
+  const reyes = campaignOf(s.scenario) === "reyes";
+  if (!touched) { document.getElementById("helpers").value = s.helpers || 0; document.getElementById("boost").value = s.boost || 1; }
+  const pu = document.getElementById("paramsUsed");
+  pu.style.display = "";
+  pu.innerHTML = `En la rama: <b>+${s.helpers || 0} ${reyes ? "pajes" : "duendes"}</b> por ruta · impulso de ${reyes ? "camellos" : "renos"} <b>×${nf2.format(s.boost || 1)}</b>`;
+  document.getElementById("branch").textContent = "⑂ " + s.branch;
+  const ph = document.getElementById("phases");
+  const done = new Map(s.phases.map((p) => [p.phase, p]));
+  ph.innerHTML = Object.keys(PHASE).map((k) => {
+    const p = done.get(k);
+    const cls = p ? p.status : "";
+    const t = p && p.s !== null ? `${p.s.toLocaleString("es-ES")} s` : p ? "…" : "";
+    return `<li class="${cls}"><span>${p && p.status === "done" ? "✓" : p && p.status === "error" ? "✗" : "○"} ${PHASE[k]}</span><span>${t}</span></li>`;
+  }).join("");
+  document.getElementById("err").textContent = s.error ? "Error: " + s.error : "";
+  document.getElementById("run").disabled = s.status === "running";
+
+  const sc = scenarios.find((x) => x.scenario_id === s.scenario);
+  const replay = s.scenario === "cortes_barcelona";
+  document.getElementById("replay").style.display = replay ? "" : "none";
+  if (replay && sc) {
+    const mins = [...new Set(sc.zones.map((z) => z.properties.appears_at_min))].sort((a, b) => a - b);
+    const m = document.getElementById("minutes");
+    m.innerHTML = "";
+    for (const v of mins) {
+      const b = document.createElement("button");
+      b.className = "ghost" + (s.minute === v ? " on" : "");
+      b.textContent = `min ${v}`;
+      b.disabled = s.status === "running";
+      b.onclick = () => setMinute(v);
+      m.appendChild(b);
+    }
+  }
+  if (sc) drawZones(sc.zones, replay ? s.minute : undefined);
+  if (s.status !== "done" || !s.kpi) { document.getElementById("results").style.display = "none"; renderParams(); return; }
+
+  const k = s.kpi, g = s.suggest || {};
+  document.getElementById("results").style.display = "";
+  const row = (label, prod, sim) => `<tr><td>${label}</td><td>${fmt(prod)}</td><td class="sim">${fmt(sim)}</td></tr>`;
+  document.getElementById("cmp").innerHTML =
+    `<tr><th></th><th>Producción</th><th>Rama</th></tr>` +
+    row("Paradas de la noche", k.stops, k.stops) +
+    row("Tramos afectados", 0, k.affected_legs) +
+    row("Hogares sin acceso", 0, k.unreachable_households) +
+    row("Tramos con desvío (est.)", 0, k.detours_est) +
+    row("+ min por tramo afectado", 0, k.extra_min_per_leg) +
+    row("Paradas fuera de la noche · sin parámetros", 0, k.late_stops_without_params ?? k.late_stops) +
+    row("Paradas fuera de la noche · con parámetros", 0, k.late_stops) +
+    row("Carga de la ruta más cargada", "×1", k.max_load !== undefined ? `×${k.max_load.toLocaleString("es-ES")}` : "—") +
+    row("Tiempo de simulación", "—", `${fmt(k.elapsed_s)} s`);
+  document.getElementById("routes").innerHTML = (k.routes || []).map((r) => {
+    const pct = Math.min(100, Math.round(((r.load_factor - 1) / Math.max(r.load_factor, 1)) * 100));
+    return `<div style="margin-top:.45rem"><div class="row" style="justify-content:space-between"><span>${BRINGER[r.bringer] || r.bringer}</span>
+      <small class="note" style="margin:0">${r.load_raw && r.load_raw !== r.load_factor ? `×${r.load_raw.toLocaleString("es-ES")} → ` : ""}×${r.load_factor.toLocaleString("es-ES")} · ${fmt(r.late_stops)} paradas tarde</small></div>
+      <div class="bar"><span style="width:${pct}%"></span></div></div>`;
+  }).join("");
+
+  const items = [];
+  if (g.detours) items.push(`<div class="sug desvio"><b>Desvíos: ${fmt(g.detours)} dibujados en verde</b>
+    <small>pgr_dijkstra sobre la red con la incidencia; los peores tramos (≈${fmt(k.detours_est)} en total).</small></div>`);
+  if (g.pickup_households) items.push(`<div class="sug recogida"><b>${fmt(g.pickup_households)} hogares sin acceso → ${fmt(g.pickup_points)} puntos de recogida</b>
+    <small>El punto accesible más cercano fuera de la zona, agrupado (~0,8 km).</small></div>`);
+  const helperWord = g.helpers === 1 ? (campaignOf(s.scenario) === "reyes" ? "paje real" : "ayudante") : g.helper_label;
+  if (g.helpers) items.push(`<div class="sug refuerzo"><b>Refuerzo: ${fmt(g.helpers)} ${helperWord}</b>
+    <small>Se les traspasan las ${fmt(g.stops_to_helpers)} últimas paradas que ya no caben en la noche.</small></div>`);
+  if (g.children) items.push(`<div class="sug ninos"><b>Primero los hogares con niños</b>
+    <small>Hogares con niños que llegarían tarde: ${fmt(g.children.late_with_children_now)} → ${fmt(g.children.late_with_children_if_prioritised)} priorizando.</small></div>`);
+  if (g.resequence) items.push(`<div class="sug tsp"><b>Reordenar ${fmt(g.resequence.stops)} paradas afectadas (pgr_TSP)</b>
+    <small>${fmt(g.resequence.before_min)} → ${fmt(g.resequence.after_min)} min (−${fmt(g.resequence.saving_pct)} %). Con la incidencia, el orden planificado (vecino a vecino) ya no es el mejor para estas paradas.</small></div>`);
+  if (!g.resequence && String(g.resequence_skipped || "").startsWith("error")) {
+    const why = String(g.resequence_skipped).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+    items.push(`<div class="sug tsp"><b>Reordenar (pgr_TSP) no disponible</b><small>${why}</small></div>`);
+  }
+  document.getElementById("sugs").innerHTML = items.join("") || `<p class="note">Sin sugerencias.</p>`;
+  document.getElementById("applyNote").textContent = s.applied
+    ? `Plan aplicado a producción (navidad_geo.applied_plan): ${fmt(s.applied.rows)} filas.` : "";
+  if (s.geojson) drawSim(s.geojson);
+  renderParams();
+}
+
+async function replan() {
+  if (!current) return;
+  document.getElementById("replan").disabled = true;
+  try {
+    await api(`/api/sim/${current.branch}/params`, { method: "POST", headers: { "content-type": "application/json" },
+                                                    body: JSON.stringify(params()) });
+    refresh(current.branch);
+  } catch (e) { document.getElementById("err").textContent = String(e); }
+}
+let touched = false;  // until the user moves a slider, the sliders show the current branch's parameters
+let planTimer = null;
+for (const id of ["helpers", "boost"]) document.getElementById(id).addEventListener("input", () => {
+  touched = true; renderParams();
+  if (!selected && planned) { clearTimeout(planTimer); planTimer = setTimeout(runPlan, 250); }  // plan mode: live
+});
+document.getElementById("city").addEventListener("change", () => {
+  const sc = scenarios.find((x) => x.scenario_id === selected);
+  if (sc && sc.city !== document.getElementById("city").value) { selected = null; layers.zones.clearLayers(); }
+  renderScenarios(); renderParams(); planned = null;
+});
+document.getElementById("night").addEventListener("change", () => {
+  const sc = scenarios.find((x) => x.scenario_id === selected);
+  if (sc && sc.campaign !== document.getElementById("night").value) { selected = null; layers.zones.clearLayers(); }
+  renderScenarios(); renderParams(); planned = null;
+});
+document.getElementById("replan").addEventListener("click", replan);
+
+async function refresh(branch) {
+  clearTimeout(poll);
+  try {
+    const s = await api(`/api/sim/${branch}`);
+    renderSim(s);
+    if (s.status === "running") poll = setTimeout(() => refresh(branch), 1500);
+  } catch (e) { document.getElementById("err").textContent = String(e); }
+}
+
+const BCOL = { papa_noel: "#c81e1e", olentzero: "#7c4a1e", tio: "#d97706", apalpador: "#2f6f3e",
+               melchor: "#6d28d9", gaspar: "#0e7490", baltasar: "#b45309" };
+const tfmt = (iso, tz) => new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: tz || "Europe/Madrid" }).format(new Date(iso));
+let planReq = 0, planned = null;
+async function runPlan() {
+  const my = ++planReq;
+  const body = { city: document.getElementById("city").value, campaign: document.getElementById("night").value, ...params() };
+  document.getElementById("runNote").textContent = "Calculando…";
+  try {
+    const p = await api("/api/plan", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    if (my !== planReq) return;
+    planned = p; renderPlan(p);
+    document.getElementById("runNote").textContent = "";
+  } catch (e) { document.getElementById("runNote").textContent = String(e); }
+}
+function renderPlan(p) {
+  document.getElementById("emptyNote").style.display = "none";
+  document.getElementById("simBox").style.display = "none";
+  document.getElementById("planBox").style.display = "";
+  const reyes = p.campaign === "reyes", who = reyes ? "pajes" : "duendes", tz = (p.routes[0] || {}).timezone;
+  const row = (l, a, b) => `<tr><td>${l}</td><td>${a}</td><td class="sim">${b}</td></tr>`;
+  document.getElementById("planCmp").innerHTML = `<tr><th></th><th>Hoy</th><th>Con parámetros</th></tr>`
+    + row("Paradas de la noche", fmt(p.stops), fmt(p.stops))
+    + row("Portadores por ruta", "1", `1 + ${p.params.helpers} ${who}`)
+    + row("Inicio", tfmt(p.start_utc, tz), tfmt(p.start_utc, tz))
+    + row("Fin de la noche", tfmt(p.end_utc, tz), tfmt(p.end_new_utc, tz))
+    + row("Horas ahorradas", "—", nf2.format(p.hours_saved))
+    + row("Carga relativa", "×1", `×${nf2.format(p.load)}`);
+  document.getElementById("planRoutes").innerHTML = p.routes.map((r) => `
+    <div style="margin-top:.5rem"><div class="row" style="justify-content:space-between"><span>${BRINGER[r.bringer] || r.bringer}</span>
+      <small class="note" style="margin:0">${fmt(r.stops)} paradas · ${fmt(r.stops_per_carrier)} por portador · fin ${tfmt(r.end_utc, r.timezone)} → ${tfmt(r.end_new_utc, r.timezone)}</small></div>
+      <div class="bar"><span style="width:${Math.round(100 * r.hours_new / Math.max(r.hours, 0.01))}%;background:var(--green)"></span></div></div>`).join("")
+    + `<p class="note">Cada ayudante rinde ≈ ${Math.round(p.params.helper_capacity * 100)} % de un portador; el impulso acelera el trayecto (≈ ${Math.round(p.params.travel_share * 100)} % del tiempo, medido en una simulación con pgRouting). Barra = duración con parámetros frente a hoy.</p>`;
+  layers.stops.clearLayers(); layers.sugs.clearLayers(); layers.zones.clearLayers();
+  const pts = p.sample.map((x) => L.circleMarker([x.lat, x.lon], { radius: 2.5, weight: 0, fillOpacity: 0.75, fillColor: BCOL[x.b] || "#555" }).addTo(layers.stops));
+  if (pts.length) map.fitBounds(L.featureGroup(pts).getBounds(), { padding: [30, 30], maxZoom: 13 });
+}
+
+async function run() {
+  if (!selected) return runPlan();
+  document.getElementById("run").disabled = true;
+  layers.stops.clearLayers(); layers.sugs.clearLayers();
+  try {
+    const { branch } = await api("/api/sim", { method: "POST", headers: { "content-type": "application/json" },
+                                              body: JSON.stringify({ scenario: selected, ...params() }) });
+    refresh(branch);
+  } catch (e) { document.getElementById("runNote").textContent = String(e); document.getElementById("run").disabled = false; }
+}
+
+async function setMinute(minute) {
+  if (!current) return;
+  await api(`/api/sim/${current.branch}/minute`, { method: "POST", headers: { "content-type": "application/json" },
+                                                  body: JSON.stringify({ minute }) });
+  refresh(current.branch);
+}
+
+document.getElementById("run").onclick = run;
+document.getElementById("apply").onclick = async () => {
+  if (!current) return;
+  document.getElementById("apply").disabled = true;
+  try { const a = await api(`/api/sim/${current.branch}/apply`, { method: "POST" }); current.applied = a; renderSim(current); }
+  catch (e) { document.getElementById("applyNote").textContent = String(e); }
+  finally { document.getElementById("apply").disabled = false; }
+};
+document.getElementById("discard").onclick = async () => {
+  if (!current || !confirm(`¿Borrar la rama ${current.branch}?`)) return;
+  try { await api(`/api/sim/${current.branch}`, { method: "DELETE" }); }
+  catch (e) { document.getElementById("err").textContent = String(e); return; }
+  current = null; document.getElementById("simBox").style.display = "none";
+  layers.stops.clearLayers(); layers.sugs.clearLayers();
+  document.getElementById("run").disabled = !selected;
+};
+
+(async () => {
+  try {
+    const [sc, opts] = await Promise.all([api("/api/incidents/scenarios"), api("/api/plan/options")]);
+    scenarios = sc.scenarios;
+    const withGraph = new Set(scenarios.map((x) => x.city));
+    document.getElementById("city").innerHTML = opts.cities.map((c) =>
+      `<option value="${c.city}">${c.city}${withGraph.has(c.city) ? " · what-if" : ""}</option>`).join("");
+    document.getElementById("city").value = "Valencia";
+    document.getElementById("cityNote").textContent = `${opts.cities.length} ciudades · campaña ${opts.years[0]} · «what-if» = con red de carreteras para escenarios`;
+    renderScenarios();
+    const { simulations } = await api("/api/sim");
+    const last = simulations.filter((s) => s.status !== "huérfana").pop();
+    const orphans = simulations.filter((s) => s.status === "huérfana").length;
+    if (orphans) document.getElementById("runNote").textContent = `${orphans} rama(s) de simulación anteriores (se borran al pasar de 3).`;
+    if (last) {
+      selected = last.scenario;
+      const sc0 = scenarios.find((x) => x.scenario_id === last.scenario);
+      if (sc0) { document.getElementById("city").value = sc0.city; document.getElementById("night").value = sc0.campaign; }
+      renderScenarios(); refresh(last.branch);
+    }
+  } catch (e) { document.getElementById("scenarios").innerHTML = `<p class="err">${e}</p>`; }
+})();
+</script>
+<script src="/static/navidad-fx.js" defer></script>
+</body>
+</html>

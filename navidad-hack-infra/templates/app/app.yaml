@@ -1,0 +1,15 @@
+command:
+  - uvicorn
+  - app:app
+  - --host
+  - 0.0.0.0
+  - --port
+  - "8000"
+
+# Resources are filled by deploy_app.py.
+# Lakebase Autoscaling database resource key: navidad-pg
+# Do not attach the demo console SQL warehouse.
+
+env:
+  - name: NAVIDAD_MODEL
+    value: system.ai.claude-opus-5

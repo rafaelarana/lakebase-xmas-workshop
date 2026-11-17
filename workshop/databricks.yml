@@ -1,0 +1,38 @@
+# Opcional (camino C): lo mismo que «Run all» en 00_workbench, como job serverless.
+#   databricks bundle deploy -t workshop --var catalog=<catálogo> --profile <perfil>
+#   databricks bundle run taller_navidad -t workshop --var catalog=<catálogo> --profile <perfil>
+bundle:
+  name: taller-navidad-lakebase
+
+variables:
+  catalog:
+    description: Catálogo existente donde puedes crear un esquema
+  scale:
+    default: "0.1"
+  sync_mode:
+    default: SNAPSHOT
+
+sync:
+  paths:
+    - ../navidad-hack-infra
+    - ../navidad-hack-build-assistant
+    - ./notebooks
+
+resources:
+  jobs:
+    taller_navidad:
+      name: taller-navidad-${workspace.current_user.short_name}
+      tasks:
+        - task_key: workbench
+          notebook_task:
+            notebook_path: ./notebooks/00_workbench.py
+            base_parameters:
+              catalog: ${var.catalog}
+              scale: ${var.scale}
+              sync_mode: ${var.sync_mode}
+              incidents: "sí"
+
+targets:
+  workshop:
+    default: true
+    mode: development

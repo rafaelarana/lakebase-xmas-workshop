@@ -1,0 +1,17 @@
+Lakebase Xmas Workshop (English edition of «Taller de Navidad») · Lakebase
+Copyright 2026 The Lakebase Xmas Workshop authors
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This is the Spain edition of a Lakebase holiday hackathon kit originally created by
+Databricks colleagues in the UK, adapted and extended with their agreement.
+
+Third-party data shipped in this repository:
+- Road networks in navidad-hack-infra/data/*_osm.csv.gz are derived from OpenStreetMap.
+  © OpenStreetMap contributors, available under the Open Database License (ODbL) 1.0:
+  https://www.openstreetmap.org/copyright
+- Land masks in navidad-hack-infra/scripts/es_land.py are derived from Natural Earth
+  (public domain): https://www.naturalearthdata.com/
+
+All people, households and journeys are synthetic. Incident scenarios are inspired by
+real events; their geometry is illustrative.

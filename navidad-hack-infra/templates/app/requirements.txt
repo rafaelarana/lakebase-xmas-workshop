@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+psycopg2-binary
+databricks-sdk==0.122.0
+httpx

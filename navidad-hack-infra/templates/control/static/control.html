@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Centro de control — Taller de Navidad</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="/static/navidad-fx.css" />
+<style>
+  :root { font-family: system-ui, sans-serif; color: #1f2933; --bg: #f5f3ef; --panel: #fff; --line: #e3ded6; --ok: #1f8f5f; --bad: #d92d20; --warn: #c27c0e; --muted: #6b7280; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); }
+  header { padding: 1rem 1.5rem 0.5rem; display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+  header h1 { font-size: 1.35rem; margin: 0; }
+  header .sub { color: var(--muted); font-size: 0.9rem; }
+  header a { font-size: 0.85rem; color: var(--muted); }
+  .bar { display: flex; flex-wrap: wrap; gap: 0.6rem 1.2rem; padding: 0.35rem 1.5rem; align-items: center; font-size: 0.85rem; }
+  .live { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 700; letter-spacing: .06em; font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 999px; background: #e8f5ee; color: var(--ok); }
+  .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: blink 1.2s infinite; }
+  .live.off { background: #eee; color: var(--muted); } .live.off i { background: #bbb; animation: none; }
+  @keyframes blink { 50% { opacity: .25 } }
+  .pill { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 0.15rem 0.6rem; color: #4b5563; }
+  .runctl { display: inline-flex; align-items: center; gap: 0.4rem; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.25rem 0.4rem; }
+  .runctl button { border: 0; border-radius: 8px; padding: 0.35rem 0.75rem; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
+  .runctl .play { background: var(--ok); color: #fff; } .runctl .stop { background: var(--bad); color: #fff; }
+  .runctl button:disabled { opacity: .35; cursor: not-allowed; }
+  .runctl .js { font-size: 0.78rem; color: var(--muted); max-width: 18rem; }
+  .runctl .js a { color: var(--muted); }
+  select { padding: 0.3rem 0.4rem; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); font-size: 0.85rem; }
+  .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.75rem; padding: 0.5rem 1.5rem; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem 0.8rem; }
+  .kpi .k { font-size: 0.75rem; color: var(--muted); }
+  .kpi .v { font-size: 1.35rem; font-weight: 650; margin-top: 0.15rem; font-variant-numeric: tabular-nums; }
+  .kpi .h { font-size: 0.72rem; color: #9ca3af; margin-top: 0.15rem; }
+  .prog { height: 6px; border-radius: 3px; background: #eee; margin-top: 0.4rem; overflow: hidden; }
+  .prog b { display: block; height: 100%; background: var(--ok); transition: width .6s; }
+  .main { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(320px, 1fr); gap: 0.75rem; padding: 0.25rem 1.5rem 1.5rem; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  #mapWrap { position: relative; height: 68vh; min-height: 460px; }
+  #map { position: absolute; inset: 0; border-radius: 10px; }
+  #inset { position: absolute; left: 10px; bottom: 10px; width: 210px; height: 130px; border: 2px solid #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,.2); z-index: 500; }
+  #inset .lbl { position: absolute; top: 4px; left: 6px; z-index: 600; font-size: 0.7rem; background: rgba(255,255,255,.85); padding: 0 4px; border-radius: 4px; }
+  .muted-tiles { filter: grayscale(.85) brightness(1.05) contrast(.9); }
+  .legend { position: absolute; right: 10px; bottom: 10px; z-index: 500; background: rgba(255,255,255,.92); border-radius: 8px; padding: 0.4rem 0.6rem; font-size: 0.72rem; line-height: 1.5; }
+  .legend span { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  .side { display: flex; flex-direction: column; gap: 0.75rem; max-height: 68vh; }
+  .side h2 { font-size: 0.9rem; margin: 0; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; }
+  #feed { overflow: auto; flex: 1; }
+  .exc { display: grid; grid-template-columns: 10px 1fr auto; gap: 0.5rem; padding: 0.45rem 0.8rem; border-bottom: 1px solid #f0ece6; cursor: pointer; font-size: 0.82rem; }
+  .exc:hover { background: #faf8f4; } .exc .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--bad); margin-top: 4px; }
+  .exc.rev .dot { background: var(--warn); } .exc small { color: var(--muted); display: block; } .exc time { color: #9ca3af; font-size: 0.72rem; }
+  .cities { font-size: 0.8rem; }
+  .cities .row { display: grid; grid-template-columns: 7.5rem 1fr 3.2rem 4.2rem 2.2rem; gap: 0.5rem; align-items: center; padding: 0.28rem 0.8rem; }
+  .cities .head { font-size: 0.7rem; color: var(--muted); border-bottom: 1px solid var(--line); }
+  .cities .rate { text-align: right; font-variant-numeric: tabular-nums; }
+  .cities .rate.hot { font-weight: 700; } .cities .rate.hot::before { content: "▲ "; color: var(--bad); }
+  #cities { max-height: 26vh; overflow: auto; }
+  .seg2 { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; font-size: 0.72rem; font-weight: 500; }
+  .seg2 button { border: 0; background: transparent; padding: 0.15rem 0.5rem; cursor: pointer; color: var(--muted); }
+  .seg2 button.on { background: #1f2933; color: #fff; }
+  .spark { display: block; width: 100%; height: 30px; margin-top: 0.3rem; overflow: visible; }
+  .spark path.l { fill: none; stroke: #2a78d6; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .spark path.a { fill: #2a78d6; opacity: 0.08; }
+  .spark .base { stroke: var(--line); stroke-width: 1; }
+  .spark circle.last { fill: #2a78d6; stroke: #fff; stroke-width: 2; }
+  .spark circle.hov { fill: #1f2933; stroke: #fff; stroke-width: 2; }
+  #tip { position: fixed; z-index: 3000; pointer-events: none; background: #1f2933; color: #fff; font-size: 0.75rem; padding: 0.3rem 0.5rem; border-radius: 6px; display: none; white-space: nowrap; }
+  .kstamp { font-size: 0.75rem; color: var(--muted); }
+  .cities .row .prog { margin: 0; } .cities .row .x { color: var(--bad); text-align: right; }
+  .empty { color: var(--muted); font-size: 0.85rem; padding: 1rem; }
+  #drawer { position: fixed; top: 0; right: 0; width: min(460px, 100vw); height: 100vh; background: var(--panel); box-shadow: -8px 0 30px rgba(0,0,0,.15); transform: translateX(105%); transition: transform .25s; z-index: 2000; display: flex; flex-direction: column; }
+  #drawer.on { transform: none; }
+  #drawer header { border-bottom: 1px solid var(--line); padding: 0.9rem 1rem; display: flex; justify-content: space-between; align-items: center; }
+  #drawer .body { overflow: auto; padding: 0.8rem 1rem 1.5rem; font-size: 0.88rem; }
+  #drawer dl { display: grid; grid-template-columns: 8rem 1fr; gap: 0.3rem 0.6rem; margin: 0 0 1rem; }
+  #drawer dt { color: var(--muted); } #drawer dd { margin: 0; }
+  button.primary { background: #1f2933; color: #fff; border: 0; border-radius: 8px; padding: 0.5rem 0.9rem; cursor: pointer; font-weight: 600; }
+  button.ghost { background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 0.35rem 0.7rem; cursor: pointer; }
+  .agent { background: #f7f5f1; border: 1px solid var(--line); border-radius: 10px; padding: 0.7rem 0.8rem; margin-top: 0.8rem; }
+  .agent .src { font-size: 0.72rem; color: var(--muted); }
+  .act { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 0.55rem 0.65rem; margin-top: 0.5rem; }
+  .act b { display: block; } .act small { color: var(--muted); } .act .btns { display: flex; gap: 0.4rem; margin-top: 0.45rem; }
+  .act.confirmada { border-color: var(--ok); background: #eef8f2; } .act.rechazada, .act.descartada { opacity: .5; }
+  .tag { font-size: 0.7rem; font-weight: 700; padding: 0.05rem 0.45rem; border-radius: 999px; background: #eee; }
+  .tag.confirmada { background: #dff3e7; color: var(--ok); } .tag.rechazada { background: #fde8e6; color: var(--bad); }
+  .pulse { animation: pulse 1.4s ease-out infinite; transform-origin: center; transform-box: fill-box; }
+  @keyframes pulse { 0% { stroke-width: 2; stroke-opacity: 1 } 100% { stroke-width: 14; stroke-opacity: 0 } }
+  @media (max-width: 1100px) { .main { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(3, 1fr); } .side { max-height: none; } }
+  @media (prefers-reduced-motion: reduce) { .pulse, .live i { animation: none; } }
+</style>
+<link rel="stylesheet" href="/static/nav.css" />
+</head>
+<body>
+<script src="/static/nav.js"></script>
+<header class="navidad-header" data-navidad-header style="margin: 0.75rem 1.5rem 0.25rem">
+  <span class="navidad-brand">
+    <span class="navidad-logo" data-navidad-logo><img src="/static/databricks-symbol.svg" alt="Databricks" /></span>
+    <h1>Centro de control</h1>
+  </span>
+  <span class="sub" id="subtitle">Entregas en tiempo real · Zerobus → Spark → Lakebase</span>
+</header>
+
+<div class="bar">
+  <span class="runctl" id="runctl" title="Lanza o para el job navidad-live (notebooks 04 + 05)">
+    <select id="jCampaign" aria-label="Noche"><option value="nochebuena">Nochebuena</option><option value="reyes">Reyes</option></select>
+    <select id="jMinutes" aria-label="Duración"><option value="5">5 min</option><option value="10">10 min</option><option value="15" selected>15 min</option><option value="30">30 min</option></select>
+    <select id="jIncident" aria-label="Incidencia"><option value="ninguna">Sin incidencia</option><option value="dana_valencia">DANA Valencia</option><option value="cortes_barcelona">Cortes Barcelona</option><option value="filomena_madrid">Filomena Madrid</option></select>
+    <select id="jDestino" aria-label="Destino"><option value="zerobus">Zerobus → Spark</option><option value="lakebase_directo">Directo a Lakebase</option></select>
+    <button class="play" id="jPlay">▶ Iniciar noche</button>
+    <button class="stop" id="jStop" disabled>■ Parar</button>
+    <span class="js" id="jStatus"></span>
+  </span>
+  <span class="live off" id="live"><i></i><span id="liveTxt">SIN DATOS</span></span>
+  <label>Ejecución <select id="run"></select></label>
+  <span class="pill" id="mode">—</span>
+  <span class="pill" id="speed">—</span>
+  <span class="pill" id="reads" title="De dónde lee el panel">Lecturas: —</span>
+  <span id="status" style="color:var(--muted)"></span>
+  <span class="kstamp">KPIs cada <span class="seg2" id="kEvery"><button data-s="5" class="on">5 s</button><button data-s="30">30 s</button></span> · <span id="kStamp">—</span></span>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="k">Entregados</div><div class="v" id="kDel">—</div><div class="prog"><b id="kProg" style="width:0"></b></div><div class="h" id="kPlan"></div></div>
+  <div class="kpi"><div class="k">Ritmo</div><div class="v" id="kRate">—</div><div class="h">entregas por minuto real</div><svg class="spark" id="sRate" role="img" aria-label="Entregas por intervalo"></svg></div>
+  <div class="kpi"><div class="k">Hora de la noche</div><div class="v" id="kClock">—</div><div class="h">hora peninsular</div></div>
+  <div class="kpi"><div class="k">Excepciones abiertas</div><div class="v" id="kOpen" style="color:var(--bad)">—</div><div class="h" id="kExc"></div><svg class="spark" id="sExc" role="img" aria-label="Excepciones nuevas por intervalo"></svg></div>
+  <div class="kpi"><div class="k">Resueltas</div><div class="v" id="kRes">—</div><div class="h" id="kResB"></div></div>
+  <div class="kpi"><div class="k">Latencia evento → Lakebase</div><div class="v" id="kLat">—</div><div class="h" id="kLatB">p50 · p95 de los últimos 30 s</div><svg class="spark" id="sLat" role="img" aria-label="Latencia p50 por intervalo"></svg></div>
+</div>
+
+<div class="main">
+  <div class="panel" id="mapWrap">
+    <div id="map"></div>
+    <div id="inset"><span class="lbl">Canarias</span></div>
+    <div class="legend">
+      <div><span style="background:var(--ok)"></span>Entrega (últimos segundos)</div>
+      <div><span style="background:var(--bad)"></span>Excepción abierta</div>
+      <div><span style="background:#fff;border:2px solid #1f2933"></span>Duende / paje</div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="panel" style="display:flex;flex-direction:column;min-height:0;flex:1">
+      <h2>Excepciones abiertas <span id="feedN" style="color:var(--muted);font-weight:500"></span></h2>
+      <div id="feed"><p class="empty">Aún no hay excepciones.</p></div>
+    </div>
+    <div class="panel cities"><h2>Ciudades <span class="seg2" id="citySort"><button data-v="size" class="on">Tamaño</button><button data-v="rate">% excepciones</button></span></h2><div id="cities"></div></div>
+  </div>
+</div>
+
+<div id="tip" role="tooltip"></div>
+<aside id="drawer" aria-live="polite">
+  <header><b id="dTitle">Incidencia</b><button class="ghost" id="dClose">Cerrar</button></header>
+  <div class="body" id="dBody"></div>
+</aside>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/navidad-fx.js" defer></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const nf = new Intl.NumberFormat("es-ES");
+  const pf = new Intl.NumberFormat("es-ES", { style: "percent", maximumFractionDigits: 1 });
+  const tf = (tz) => new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: tz });
+  const ago = (iso) => { const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000); return s < 60 ? `hace ${Math.round(s)} s` : `hace ${Math.round(s / 60)} min`; };
+  const BRINGERS = { papa_noel: ["Papá Noel", "#c81e1e"], olentzero: ["Olentzero", "#7c4a1e"], tio: ["Tió de Nadal", "#d97706"], apalpador: ["Apalpador", "#2f6f3e"],
+                     melchor: ["Melchor", "#6d28d9"], gaspar: ["Gaspar", "#0e7490"], baltasar: ["Baltasar", "#b45309"] };
+  const CODES = { chimenea_bloqueada: "Chimenea bloqueada", nino_despierto: "Niño despierto", perro_guardian: "Perro guardián",
+                  direccion_no_encontrada: "Dirección no encontrada", regalo_equivocado: "Regalo equivocado", retraso_transporte: "Retraso del transporte", clima: "Clima" };
+  const bName = (b) => (BRINGERS[b] || [b])[0], bColor = (b) => (BRINGERS[b] || [0, "#555"])[1];
+  const isCanary = (lon) => lon < -12;
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  function baseMap(el, center, zoom, opts = {}) {
+    const m = L.map(el, { zoomControl: !opts.inset, attributionControl: !opts.inset, preferCanvas: true, ...opts });
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, className: "muted-tiles", attribution: "© OpenStreetMap" }).addTo(m);
+    m.setView(center, zoom);
+    return m;
+  }
+  const map = baseMap("map", [40.2, -3.6], 6, { zoomSnap: 0.25 });
+  map.fitBounds([[35.9, -9.4], [43.8, 4.4]], { padding: [10, 10] });  // Península + Baleares; Canarias in the inset
+  const inset = baseMap("inset", [28.3, -15.8], 6, { inset: true, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
+  const canvas = { main: L.canvas({ padding: 0.3 }), inset: L.canvas({ padding: 0.3 }) };
+  const layers = {};
+  for (const k of ["cities", "dots", "helpers", "exc"]) layers[k] = { main: L.layerGroup().addTo(map), inset: L.layerGroup().addTo(inset) };
+  const where = (lon) => (isCanary(lon) ? "inset" : "main");
+
+  const st = { run: null, pinned: false, kEvery: 5, kLast: 0, citySort: "size", incident: null, zoneLayer: null, cursor: null, dots: [], helpers: new Map(), exc: new Map(), cityMarks: new Map(), busy: false, lastData: 0, open: null };
+
+  // latency in seconds from the API (ms resolution): < 1 s → ms (direct to Lakebase ≈ 20 ms), else s with 1 decimal
+  const fmtS = (v) => {
+    if (v == null) return "—";
+    const ms = Math.max(0, Math.round(v * 1000));   // clock skew can give tiny negatives → 0 ms
+    return ms < 1000 ? `${ms} ms` : `${(Math.round(v * 10) / 10).toFixed(1).replace(".", ",")} s`;
+  };
+  async function getJSON(url, opts) {
+    const r = await fetch(url, opts);
+    if (!r.ok) {
+      const e = new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+      e.status = r.status;
+      throw e;
+    }
+    return r.json();
+  }
+
+  function reset() {
+    for (const k in layers) { layers[k].main.clearLayers(); layers[k].inset.clearLayers(); }
+    st.dots = []; st.helpers.clear(); st.exc.clear(); st.cityMarks.clear(); st.cursor = null;
+  }
+
+  function renderRuns(runs) {
+    const sel = $("run"), cur = sel.value;
+    const opts = runs.map((r) => `<option value="${r.sim_run_id}">${esc(r.sim_run_id)} · ${r.status === "en_curso" ? "en curso" : r.status}</option>`).join("");
+    if (sel.innerHTML !== opts) { sel.innerHTML = opts; if (cur && runs.some((r) => r.sim_run_id === cur)) sel.value = cur; }
+  }
+
+  function renderKpis(k, run) {
+    $("kDel").textContent = nf.format(k.delivered);
+    $("kProg").style.width = `${Math.min(100, (100 * k.delivered) / Math.max(1, k.planned))}%`;
+    $("kPlan").textContent = `${pf.format(k.delivered / Math.max(1, k.planned))} de ${nf.format(k.planned)} paradas`;
+    $("kRate").textContent = nf.format(k.per_min);
+    $("kClock").textContent = k.clock ? tf("Europe/Madrid").format(new Date(k.clock)) : "—";
+    $("kOpen").textContent = nf.format(k.exceptions_open);
+    $("kExc").textContent = `${nf.format(k.exceptions)} en total`;
+    $("kRes").textContent = nf.format(k.resolved_agent + k.resolved_retry);
+    $("kResB").textContent = `${nf.format(k.resolved_agent)} con el agente · ${nf.format(k.resolved_retry)} por reintento`;
+    $("kLat").textContent = fmtS(k.latency_p50);
+    $("kLatB").textContent = (k.latency_p95 == null ? "p50 · p95 de los últimos 30 s" : `p95 ${fmtS(k.latency_p95)} · últimos 30 s`)
+      + (k.stream_cycle_s ? ` · ciclo del stream ${String(k.stream_cycle_s).replace(".", ",")} s` : "");
+    $("mode").textContent = { zerobus: "Zerobus → Delta → Spark → Lakebase sink", lakebase_directo: "Escritura directa en Lakebase (ensayo)",
+                              spark_sin_broker: "Spark sin broker ni Delta → Lakebase sink" }[run.mode] || run.mode;
+    $("speed").textContent = `×${nf.format(Math.round(run.speed))} · ${run.campaign === "reyes" ? "Reyes" : "Nochebuena"} ${run.year}`;
+    const fresh = k.last_update && Date.now() - Date.parse(k.last_update) < 20000;
+    $("live").classList.toggle("off", !fresh);
+    $("liveTxt").textContent = fresh ? "EN DIRECTO" : run.status === "en_curso" ? "ESPERANDO EVENTOS" : run.status.toUpperCase();
+  }
+
+  const rateOf = (c) => (c.processed ? c.exceptions / c.processed : 0);
+  function renderCities(cities) {
+    const tp = cities.reduce((a, c) => a + c.processed, 0), te = cities.reduce((a, c) => a + c.exceptions, 0);
+    const national = tp ? te / tp : 0;
+    const isHot = (c) => c.processed > 200 && national > 0 && rateOf(c) > 1.5 * national;  // clearly above Spain
+    for (const c of cities) {
+      const pct = c.delivered / Math.max(1, c.planned);
+      const color = pct > 0.98 ? "#1f8f5f" : "#2b6cb0";
+      const hot = isHot(c);
+      const radius = 1500 + Math.sqrt(c.planned) * 90;
+      let m = st.cityMarks.get(c.city);
+      if (!m) {
+        m = L.circle([c.lat, c.lon], { radius, weight: 1.5, color, fillColor: color, fillOpacity: 0.12, interactive: true }).addTo(layers.cities[where(c.lon)]);
+        st.cityMarks.set(c.city, m);
+      }
+      m.setStyle({ color: hot ? "#d92d20" : color, dashArray: hot ? "4 4" : null, weight: hot ? 2.5 : 1.5, fillColor: color, fillOpacity: 0.08 + 0.25 * pct });
+      m.bindTooltip(`<b>${esc(c.city)}</b><br>${nf.format(c.delivered)} / ${nf.format(c.planned)} entregados (${pf.format(pct)})`
+        + `<br>${pf.format(rateOf(c))} de excepciones${hot ? " · muy por encima de la media" : ""}${c.exceptions_open ? ` · ${c.exceptions_open} abiertas` : ""}`);
+    }
+    const rows = [...cities].sort(st.citySort === "rate" ? (a, b) => rateOf(b) - rateOf(a) : (a, b) => b.planned - a.planned);
+    $("cities").innerHTML = `<div class="row head"><span>Ciudad</span><span>Entregado</span><span></span><span class="rate" title="excepciones / paradas alcanzadas">% exc. · ${pf.format(national)}</span><span title="abiertas">Ab.</span></div>`
+      + rows.map((c) => {
+        const pct = c.delivered / Math.max(1, c.planned), hot = isHot(c);
+        return `<div class="row"><span>${esc(c.city)}</span><div class="prog"><b style="width:${100 * pct}%"></b></div><span>${pf.format(pct)}</span>`
+          + `<span class="rate ${hot ? "hot" : ""}" ${hot ? 'aria-label="muy por encima de la media"' : ""}>${c.processed ? pf.format(rateOf(c)) : "—"}</span><span class="x">${c.exceptions_open || ""}</span></div>`;
+      }).join("");
+  }
+
+  function renderDots(recent) {
+    const now = Date.now();
+    for (const p of recent) {
+      const ok = p.s === "e";
+      const m = L.circleMarker([p.lat, p.lon], { renderer: canvas[where(p.lon)], radius: ok ? 2.2 : 3, weight: 0, fillOpacity: 0.85, fillColor: ok ? "#1f8f5f" : "#d92d20", interactive: false });
+      m.addTo(layers.dots[where(p.lon)]);
+      st.dots.push([now, m, where(p.lon)]);
+    }
+    while (st.dots.length && (now - st.dots[0][0] > 20000 || st.dots.length > 8000)) {
+      const [, m, w] = st.dots.shift(); layers.dots[w].removeLayer(m);
+    }
+    for (const [t, m] of st.dots) m.setStyle({ fillOpacity: Math.max(0.1, 0.85 * (1 - (now - t) / 20000)) });
+  }
+
+  function renderHelpers(helpers) {
+    for (const h of helpers) {
+      let m = st.helpers.get(h.helper_id);
+      if (!m) {
+        m = L.circleMarker([h.lat, h.lon], { radius: 4.5, weight: 2, color: "#fff", fillColor: bColor(h.bringer), fillOpacity: 1 }).addTo(layers.helpers[where(h.lon)]);
+        st.helpers.set(h.helper_id, m);
+      } else m.setLatLng([h.lat, h.lon]);
+      m.bindTooltip(`${h.helper_kind === "paje" ? "Paje" : "Duende"} <b>${esc(h.helper_name)}</b><br>${bName(h.bringer)} · ${esc(h.city)}`);
+    }
+  }
+
+  const excRadius = () => (map.getZoom() < 8 ? 3.5 : 6);  // national view: let the deliveries show through
+  map.on("zoomend", () => { for (const m of st.exc.values()) m.setRadius(excRadius()); });
+
+  function renderExceptions(list) {
+    const seen = new Set(list.map((e) => e.event_id));
+    for (const [id, m] of st.exc) if (!seen.has(id)) { m.remove(); st.exc.delete(id); }
+    for (const e of list) {
+      let m = st.exc.get(e.event_id);
+      if (!m) {
+        m = L.circleMarker([e.lat, e.lon], { radius: excRadius(), weight: 2, color: "#d92d20", fillColor: "#d92d20", fillOpacity: 0.9, className: "pulse", renderer: L.svg() })
+          .on("click", () => openException(e.event_id)).addTo(layers.exc[where(e.lon)]);
+        st.exc.set(e.event_id, m);
+      }
+      m.setStyle({ color: e.state === "en_revision" ? "#c27c0e" : "#d92d20", fillColor: e.state === "en_revision" ? "#c27c0e" : "#d92d20" });
+      m.bindTooltip(`<b>${CODES[e.exception_code] || e.exception_code}</b><br>${esc(e.city)} · ${bName(e.bringer)}`);
+    }
+    $("feedN").textContent = list.length ? nf.format(list.length) : "";
+    $("feed").innerHTML = list.length ? list.slice(0, 80).map((e) => `
+      <div class="exc ${e.state === "en_revision" ? "rev" : ""}" data-id="${e.event_id}">
+        <span class="dot"></span>
+        <div><b>${CODES[e.exception_code] || esc(e.exception_code)}</b><small>${esc(e.city)} · ${bName(e.bringer)} · ${e.helper_kind === "paje" ? "paje" : "duende"} ${esc(e.helper_name || e.helper_id)}${e.state === "en_revision" ? " · en revisión" : ""}</small></div>
+        <time>${tf("Europe/Madrid").format(new Date(e.event_ts))}</time>
+      </div>`).join("") : `<p class="empty">Sin excepciones abiertas.</p>`;
+    $("feed").querySelectorAll(".exc").forEach((el) => el.addEventListener("click", () => openException(el.dataset.id)));
+  }
+
+  async function tick() {
+    if (st.busy) return; st.busy = true;
+    try {
+      const q = new URLSearchParams();
+      if (st.pinned && st.run) q.set("run", st.run);  // otherwise follow the newest run
+      if (st.cursor) q.set("since", st.cursor);
+      const d = await getJSON(`/api/control/state?${q}`);
+      if (!d.run) { $("status").textContent = "No hay ejecuciones: arranca 05_tiempo_real_productor."; return; }
+      renderRuns(d.runs);
+      if (st.run && st.run !== d.run.sim_run_id) reset();
+      st.run = d.run.sim_run_id; $("run").value = st.run;
+      if (Date.now() - st.kLast >= st.kEvery * 1000 || st.kRun !== d.run.sim_run_id) {
+        st.kLast = Date.now(); st.kRun = d.run.sim_run_id;
+        renderKpis(d.kpis, d.run); renderCities(d.cities); loadTrends(d.run.sim_run_id);
+        $("kStamp").textContent = `actualizado ${new Date().toLocaleTimeString("es-ES")}`;
+      }
+      renderZone(d.run.incident);
+      if (d.reads) {
+        const rep = d.reads.target === "replica";
+        $("reads").textContent = rep ? `Lecturas: réplica (${d.reads.endpoint})` : "Lecturas: primaria";
+        $("reads").style.borderColor = rep ? "#1f8f5f" : "";
+        $("reads").title = rep ? "El panel lee de una réplica de lectura; ingesta y decisiones escriben en la primaria" : "Sin réplica de lectura: el panel lee de la primaria";
+      }
+      renderDots(d.recent); renderHelpers(d.helpers); renderExceptions(d.exceptions);
+      st.cursor = d.cursor; $("status").textContent = "";
+    } catch (err) {
+      $("status").textContent = err.status === 503 ? err.message : `Sin conexión con el app: ${err.message}`;
+    } finally { st.busy = false; }
+  }
+  $("run").addEventListener("change", () => {
+    st.run = $("run").value; st.pinned = st.run !== $("run").options[0]?.value;  // picking the newest = follow again
+    reset(); tick();
+  });
+
+  // ------------------------------------------------------------ trends: one series per sparkline (title names it)
+  function spark(svg, pts, fmt) {
+    const W = svg.clientWidth || 200, H = 30, n = pts.length;
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    const vals = pts.map((p) => p.v).filter((v) => v != null);
+    if (n < 2 || !vals.length) { svg.innerHTML = ""; svg._pts = null; return; }
+    const max = Math.max(...vals) || 1, x = (i) => (i * (W - 6)) / (n - 1) + 3, y = (v) => H - 3 - (v / max) * (H - 8);
+    let d = "", started = false;
+    pts.forEach((p, i) => { if (p.v == null) { started = false; return; } d += `${started ? "L" : "M"}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`; started = true; });
+    const li = pts.map((p) => p.v).lastIndexOf(vals[vals.length - 1]);
+    svg.innerHTML = `<line class="base" x1="0" x2="${W}" y1="${H - 2}" y2="${H - 2}"/><path class="a" d="${d}L${x(li).toFixed(1)},${H - 2}L${x(pts.findIndex((p) => p.v != null)).toFixed(1)},${H - 2}Z"/>`
+      + `<path class="l" d="${d}"/><circle class="last" r="4" cx="${x(li)}" cy="${y(pts[li].v)}"/><circle class="hov" r="4" style="display:none"/>`;
+    svg._pts = pts.map((p, i) => ({ ...p, x: x(i), y: p.v == null ? null : y(p.v) })); svg._fmt = fmt;
+  }
+  function hoverSpark(svg) {
+    const tip = $("tip");
+    svg.addEventListener("mousemove", (ev) => {
+      if (!svg._pts) return;
+      const r = svg.getBoundingClientRect(), mx = ((ev.clientX - r.left) / r.width) * (svg.viewBox.baseVal.width || r.width);
+      const p = svg._pts.reduce((a, b) => (Math.abs(b.x - mx) < Math.abs(a.x - mx) ? b : a));
+      const h = svg.querySelector("circle.hov");
+      if (p.y == null) { h.style.display = "none"; tip.style.display = "none"; return; }
+      h.setAttribute("cx", p.x); h.setAttribute("cy", p.y); h.style.display = "";
+      tip.textContent = `${new Date(p.t).toLocaleTimeString("es-ES")} · ${svg._fmt(p.v)}`;
+      tip.style.left = `${ev.clientX + 12}px`; tip.style.top = `${ev.clientY - 28}px`; tip.style.display = "block";
+    });
+    svg.addEventListener("mouseleave", () => { tip.style.display = "none"; const h = svg.querySelector("circle.hov"); if (h) h.style.display = "none"; });
+  }
+  ["sRate", "sExc", "sLat"].forEach((id) => hoverSpark($(id)));
+  async function loadTrends(run) {
+    try {
+      const m = await getJSON(`/api/control/metrics?${new URLSearchParams({ run, bucket: st.kEvery })}`);
+      const per = 60 / m.bucket, S = m.series;
+      spark($("sRate"), S.map((p) => ({ t: p.t, v: Math.round(p.delivered * per) })), (v) => `${nf.format(v)} entregas/min`);
+      spark($("sExc"), S.map((p) => ({ t: p.t, v: p.exceptions })), (v) => `${nf.format(v)} excepciones nuevas en ${m.bucket} s`);
+      spark($("sLat"), S.map((p) => ({ t: p.t, v: p.p50 })), (v) => `p50 ${fmtS(v)}`);
+    } catch (err) { /* trends are best-effort */ }
+  }
+  $("kEvery").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    st.kEvery = +b.dataset.s; st.kLast = 0;
+    $("kEvery").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+  }));
+  $("citySort").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    st.citySort = b.dataset.v; st.kLast = 0;
+    $("citySort").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+  }));
+  async function renderZone(incident) {
+    if (incident === st.incident) return;
+    st.incident = incident;
+    if (st.zoneLayer) { st.zoneLayer.remove(); st.zoneLayer = null; }
+    if (!incident) return;
+    try {
+      const gj = await getJSON(`/api/control/zones?scenario=${encodeURIComponent(incident)}`);
+      st.zoneLayer = L.geoJSON(gj, { style: { color: "#d92d20", weight: 2, dashArray: "6 4", fillColor: "#d92d20", fillOpacity: 0.08 },
+        onEachFeature: (f, l) => l.bindTooltip(`<b>${esc(f.properties.label)}</b><br>ráfaga de excepciones en la franja central de las visitas a la zona`) }).addTo(map);
+    } catch (err) { /* incidents track not installed */ }
+  }
+
+  // ------------------------------------------------------------ incident drawer + agent
+  function actionsHtml(actions) {
+    return actions.map((a) => `
+      <div class="act ${a.status}" data-id="${a.action_id}">
+        <b>${esc(a.label)}</b>${a.effect ? `<small>${esc(a.effect)}</small>` : ""}
+        ${a.status === "propuesta" ? `<div class="btns"><button class="primary" data-do="confirm">Confirmar</button><button class="ghost" data-do="reject">Rechazar</button></div>`
+                                   : `<div style="margin-top:.35rem"><span class="tag ${a.status}">${a.status}</span>${a.decided_by ? ` <small>por ${esc(a.decided_by)}</small>` : ""}</div>`}
+      </div>`).join("");
+  }
+
+  async function openException(id) {
+    st.open = id; $("drawer").classList.add("on");
+    $("dBody").innerHTML = `<p class="empty">Cargando…</p>`;
+    try { renderDrawer(await getJSON(`/api/control/exceptions/${id}`)); }
+    catch (err) { $("dBody").innerHTML = `<p class="empty">No se pudo cargar: ${esc(err.message)}</p>`; }
+  }
+
+  function renderDrawer(d, review) {
+    const e = d.exception, h = d.household || {};
+    const tz = h.timezone || "Europe/Madrid";
+    $("dTitle").textContent = d.code_name;
+    const last = review || (d.reviews[0] && { diagnosis: d.reviews[0].diagnosis, source: d.reviews[0].source, latency_ms: d.reviews[0].latency_ms,
+      actions: d.actions.filter((a) => a.review_id === d.reviews[0].review_id) });
+    $("dBody").innerHTML = `
+      <dl>
+        <dt>Estado</dt><dd>${esc(e.state)}${e.resolution ? ` · ${esc(e.resolution)}` : ""}</dd>
+        <dt>Hogar</dt><dd>${esc(h.label || e.household_id)} · ${esc(e.city)}</dd>
+        <dt>Personas</dt><dd>${h.household_size ?? "—"} (${h.children ?? 0} niños) · regalos en «${esc(h.window_policy || "—")}»</dd>
+        <dt>Portador</dt><dd>${bName(e.bringer)} · ${e.helper_kind === "paje" ? "paje" : "duende"} ${esc(e.helper_name || e.helper_id)}</dd>
+        <dt>Hora</dt><dd>${tf(tz).format(new Date(e.event_ts))} (${tz === "Atlantic/Canary" ? "hora canaria" : "hora peninsular"})</dd>
+        <dt>Cerca</dt><dd>${d.nearby_helpers.map((x) => `${esc(x.helper_name)} (${nf.format(x.distance_m)} m)`).join(" · ") || "—"}</dd>
+        <dt>Contexto</dt><dd>${d.similar_open_in_city} casos parecidos abiertos${d.active_incident_zones.length ? ` · zona «${esc(d.active_incident_zones[0])}»` : ""}</dd>
+      </dl>
+      ${e.state === "resuelta" ? "" : `<button class="primary" id="dReview">${last ? "Volver a revisar" : "Revisar con el agente"}</button>`}
+      <div id="dAgent">${last ? `<div class="agent"><div class="src">${last.source === "llm" ? "Agente (modelo)" : "Agente (reglas)"} · ${nf.format(last.latency_ms || 0)} ms</div>
+        <p style="margin:.4rem 0">${esc(last.diagnosis)}</p>${actionsHtml(last.actions || [])}
+        <p class="src" style="margin-top:.6rem">El agente no cambia nada hasta que confirmas una acción.</p></div>` : ""}</div>`;
+    const btn = $("dReview");
+    if (btn) btn.addEventListener("click", async () => {
+      btn.disabled = true; btn.textContent = "El agente está revisando…";
+      try { const r = await getJSON(`/api/control/exceptions/${e.event_id}/review`, { method: "POST" }); renderDrawer(await getJSON(`/api/control/exceptions/${e.event_id}`), r); tick(); }
+      catch (err) { btn.disabled = false; btn.textContent = "Revisar con el agente"; $("dAgent").innerHTML = `<p class="empty">${esc(err.message)}</p>`; }
+    });
+    $("dBody").querySelectorAll(".act button").forEach((b) => b.addEventListener("click", async () => {
+      const id = b.closest(".act").dataset.id; b.disabled = true;
+      try { await getJSON(`/api/control/actions/${id}/${b.dataset.do}`, { method: "POST" }); openException(e.event_id); tick(); }
+      catch (err) { b.disabled = false; alert(err.message); }
+    }));
+  }
+  $("dClose").addEventListener("click", () => { $("drawer").classList.remove("on"); st.open = null; });
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") $("dClose").click(); });
+
+  // ------------------------------------------------------------ ▶ / ■ job control
+  const JOB_STATES = { QUEUED: "En cola…", PENDING: "Arrancando el job (≈1–2 min)…", RUNNING: "En marcha", TERMINATING: "Parando…",
+                       BLOCKED: "Bloqueado", WAITING_FOR_RETRY: "Reintentando…" };
+  let jobBusy = false, stopping = false;  // cancelling a run takes ~30 s: keep saying «Parando…» until it ends
+  async function jobTick() {
+    try {
+      const j = await getJSON("/api/control/job");
+      if (!j.available) { $("jPlay").disabled = true; $("jStop").disabled = true; $("jStatus").textContent = j.message; return; }
+      if (!j.active) stopping = false;
+      $("jPlay").disabled = jobBusy || j.active; $("jStop").disabled = jobBusy || stopping || !j.active;
+      ["jCampaign", "jMinutes", "jDestino", "jIncident"].forEach((id) => { $(id).disabled = j.active; });
+      if (j.active && j.params) {  // show the running night's settings, not the defaults
+        if (j.params.campaign) $("jCampaign").value = j.params.campaign;
+        if (j.params.minutes && [...$("jMinutes").options].some((o) => o.value === j.params.minutes)) $("jMinutes").value = j.params.minutes;
+        if (j.params.destino) $("jDestino").value = j.params.destino;
+        if (j.params.incident) $("jIncident").value = j.params.incident;
+      }
+      const link = j.url ? ` · <a href="${j.url}" target="_blank" rel="noopener">ver job</a>` : "";
+      let txt = "";
+      if (j.active) {
+        txt = stopping ? "Parando…" : JOB_STATES[j.state] || j.state;
+        if (!stopping && j.state === "RUNNING" && $("live").classList.contains("off")) txt = "Preparando stream y productor…";
+        if (j.params) txt += ` · ${j.params.campaign === "reyes" ? "Reyes" : "Nochebuena"}, ${j.params.minutes} min`;
+      } else if (j.state) {
+        txt = j.result === "SUCCESS" ? "Última noche terminada" : j.result === "CANCELED" ? "Última noche parada" : `Última ejecución: ${j.result || j.state}`;
+      }
+      $("jStatus").innerHTML = esc(txt) + link;
+    } catch (err) { $("jStatus").textContent = `Job: ${err.message}`; }
+  }
+  $("jPlay").addEventListener("click", async () => {
+    jobBusy = true; $("jPlay").disabled = true; $("jStatus").textContent = "Lanzando…";
+    try {
+      await getJSON("/api/control/job/start", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaign: $("jCampaign").value, minutes: +$("jMinutes").value, destino: $("jDestino").value,
+                               incident: $("jIncident").value }) });
+      st.pinned = false;  // follow the night that is about to start
+    } catch (err) { alert(err.message); }
+    finally { jobBusy = false; jobTick(); }
+  });
+  $("jStop").addEventListener("click", async () => {
+    if (!confirm("¿Parar la noche en curso? Se cancelan el productor y el stream.")) return;
+    jobBusy = true; $("jStop").disabled = true; $("jStatus").textContent = "Parando…";
+    try { await getJSON("/api/control/job/stop", { method: "POST" }); stopping = true; }
+    catch (err) { alert(err.message); }
+    finally { jobBusy = false; jobTick(); tick(); }
+  });
+
+  tick(); setInterval(tick, 1500);
+  jobTick(); setInterval(jobTick, 4000);
+})();
+</script>
+</body>
+</html>

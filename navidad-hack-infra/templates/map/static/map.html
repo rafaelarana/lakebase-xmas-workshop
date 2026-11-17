@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mapa de rutas — Taller de Navidad</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="/static/navidad-fx.css" />
+<style>
+  :root { font-family: system-ui, sans-serif; color: #1f2933; --bg: #f5f3ef; --panel: #fff; --line: #e3ded6; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); }
+  header { padding: 1rem 1.5rem 0.5rem; display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+  header h1 { font-size: 1.35rem; margin: 0; }
+  header .sub { color: #6b7280; font-size: 0.9rem; }
+  header a { margin-left: auto; font-size: 0.85rem; color: #6b7280; }
+  .controls { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; padding: 0.5rem 1.5rem; align-items: center; }
+  .group { display: flex; align-items: center; gap: 0.35rem; }
+  .group > span { font-size: 0.8rem; color: #6b7280; margin-right: 0.15rem; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+  .seg button { border: 0; background: transparent; padding: 0.35rem 0.7rem; cursor: pointer; font-size: 0.85rem; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: #1f2933; color: #fff; }
+  select { padding: 0.3rem 0.4rem; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); font-size: 0.85rem; }
+  label.chk { font-size: 0.85rem; display: flex; gap: 0.3rem; align-items: center; }
+  .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.75rem; padding: 0.5rem 1.5rem; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem 0.8rem; }
+  .kpi .k { font-size: 0.75rem; color: #6b7280; }
+  .kpi .v { font-size: 1.25rem; font-weight: 600; margin-top: 0.15rem; }
+  .kpi .h { font-size: 0.72rem; color: #9ca3af; margin-top: 0.1rem; }
+  .main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 0.75rem; padding: 0.5rem 1.5rem 1.5rem; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  #map { height: 640px; }
+  .muted-tiles { filter: saturate(0.3) brightness(1.05) contrast(0.9); }
+  .side { padding: 0.8rem 1rem; font-size: 0.85rem; overflow: auto; max-height: 640px; }
+  .side h2 { font-size: 0.95rem; margin: 0.2rem 0 0.6rem; }
+  .route { border: 1px solid var(--line); border-radius: 8px; padding: 0.55rem 0.7rem; margin-bottom: 0.6rem; }
+  .route .t { display: flex; align-items: center; gap: 0.45rem; font-weight: 600; }
+  .sw { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex: none; }
+  .route dl { display: grid; grid-template-columns: auto 1fr; gap: 0.1rem 0.6rem; margin: 0.4rem 0 0; }
+  .route dt { color: #6b7280; } .route dd { margin: 0; text-align: right; }
+  .legend { margin-top: 0.8rem; padding-top: 0.6rem; border-top: 1px solid var(--line); }
+  .ramp { height: 10px; border-radius: 4px; margin: 0.3rem 0 0.15rem; }
+  .ramp-l { display: flex; justify-content: space-between; color: #6b7280; font-size: 0.75rem; }
+  .note { color: #6b7280; font-size: 0.78rem; margin-top: 0.6rem; }
+  .status { padding: 0 1.5rem; font-size: 0.85rem; color: #b42318; min-height: 1.1rem; }
+  .loading { color: #6b7280; }
+  #detective { display: none; margin-bottom: 0.8rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--line); }
+  #detective.on { display: block; }
+  .dsum { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-bottom: 0.6rem; }
+  .dsum div { background: #fbf7f2; border-radius: 6px; padding: 0.35rem 0.5rem; }
+  .dsum b { display: block; font-size: 1.05rem; }
+  .cause { display: flex; gap: 0.45rem; align-items: flex-start; margin: 0.3rem 0; }
+  .cause small { color: #6b7280; display: block; }
+  .bt { display: grid; grid-template-columns: 1.4rem 1fr auto; gap: 0.4rem; padding: 0.35rem 0.3rem; border-radius: 6px; cursor: pointer; align-items: center; }
+  .bt:hover { background: #f3efe9; }
+  .bt .n { color: #9ca3af; text-align: right; }
+  .bt small { color: #6b7280; display: block; }
+  @media (max-width: 1000px) { .main { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(3, 1fr); } }
+</style>
+<link rel="stylesheet" href="/static/nav.css" />
+</head>
+<body>
+<script src="/static/nav.js"></script>
+<!-- Christmas header effects (decorative, static/navidad-fx.*). Disable by default with <html data-navidad-fx="off">. -->
+<header class="navidad-header" data-navidad-header style="margin: 0.75rem 1.5rem 0.25rem">
+  <span class="navidad-brand">
+    <span class="navidad-logo" data-navidad-logo><img src="/static/databricks-symbol.svg" alt="Databricks" /></span>
+    <h1 id="title">Mapa de rutas</h1>
+  </span>
+  <span class="sub" id="subtitle"></span>
+</header>
+
+<div class="controls">
+  <div class="group"><span>Noche</span>
+    <div class="seg" id="campaignSeg">
+      <button data-v="nochebuena" class="on">Nochebuena</button>
+      <button data-v="reyes">Reyes</button>
+    </div>
+  </div>
+  <div class="group"><span>Campaña</span><select id="year"></select></div>
+  <div class="group"><span>Ciudad</span>
+    <div class="seg" id="citySeg">
+      <button data-v="Bilbao">Bilbao</button>
+      <button data-v="Barcelona">Barcelona</button>
+      <button data-v="Madrid">Madrid</button>
+    </div>
+    <select id="city"></select>
+  </div>
+  <div class="group"><span>Colorear</span>
+    <div class="seg" id="modeSeg">
+      <button data-v="bringer" class="on">Por portador</button>
+      <button data-v="time">Por hora de llegada</button>
+      <button data-v="revisit">Revisitas</button>
+    </div>
+  </div>
+  <label class="chk"><input type="checkbox" id="showPath" checked /> Trayecto</label>
+  <div class="group"><span>Vista</span>
+    <div class="seg" id="viewSeg">
+      <button data-v="city" class="on">Ciudad</button>
+      <button data-v="peninsula">Península</button>
+      <button data-v="canarias">Canarias</button>
+    </div>
+  </div>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="k">Hogares</div><div class="v" id="kHog">—</div></div>
+  <div class="kpi"><div class="k">Paradas</div><div class="v" id="kPar">—</div></div>
+  <div class="kpi"><div class="k">Km recorridos</div><div class="v" id="kKm">—</div><div class="h">orden histórico, en línea recta</div></div>
+  <div class="kpi"><div class="k">Revisitas</div><div class="v" id="kRev">—</div></div>
+  <div class="kpi"><div class="k">Primera llegada</div><div class="v" id="kIni">—</div><div class="h" id="kTz1"></div></div>
+  <div class="kpi"><div class="k">Última llegada</div><div class="v" id="kFin">—</div><div class="h" id="kTz2"></div></div>
+</div>
+<div class="status" id="status"></div>
+
+<div class="main">
+  <div class="panel"><div id="map"></div></div>
+  <div class="panel side">
+    <div id="detective"></div>
+    <h2>Rutas</h2>
+    <div id="routes"><p class="loading">Cargando…</p></div>
+    <div class="legend" id="legend"></div>
+    <p class="note" id="note"></p>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(() => {
+  const BRINGERS = {
+    papa_noel: { name: "Papá Noel", color: "#c62828" },
+    olentzero: { name: "Olentzero", color: "#2e7d32" },
+    tio:       { name: "Tió de Nadal", color: "#8d5a2b" },
+    apalpador: { name: "Apalpador", color: "#6a1b9a" },
+    melchor:   { name: "Melchor", color: "#d4a017" },
+    gaspar:    { name: "Gaspar", color: "#b0122c" },
+    baltasar:  { name: "Baltasar", color: "#2a52be" },
+  };
+  const RAMP = ["#1d2c6b", "#4b3a99", "#9a3f8f", "#e0645a", "#f6b443", "#f9e27a"];
+  const nf = new Intl.NumberFormat("es-ES");
+  const nf1 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 });
+  const bName = (b) => (BRINGERS[b] || { name: b }).name;
+  const bColor = (b) => (BRINGERS[b] || { color: "#555" }).color;
+  const tzLabel = (tz) => (tz === "Atlantic/Canary" ? "hora canaria" : "hora peninsular");
+  const fmtTime = (iso, tz) => iso ? new Intl.DateTimeFormat("es-ES", { timeZone: tz, hour: "2-digit", minute: "2-digit" }).format(new Date(iso)) : "—";
+  const fmtDateTime = (iso, tz) => new Intl.DateTimeFormat("es-ES", { timeZone: tz, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+
+  function rampColor(t) {
+    t = Math.max(0, Math.min(1, t));
+    const x = t * (RAMP.length - 1), i = Math.min(RAMP.length - 2, Math.floor(x)), f = x - i;
+    const a = RAMP[i].match(/\w\w/g).map((h) => parseInt(h, 16));
+    const b = RAMP[i + 1].match(/\w\w/g).map((h) => parseInt(h, 16));
+    return "#" + a.map((v, k) => Math.round(v + (b[k] - v) * f).toString(16).padStart(2, "0")).join("");
+  }
+
+  const CAUSES = {
+    vuelta_cara: { name: "Vuelta cara", color: "#d92d20",
+      why: "La ruta ya había avanzado a otro bloque del barrio: volver supone ≥ 1 km de rodeo para un solo hogar." },
+    reintento_inmediato: { name: "Reintento inmediato", color: "#f79009",
+      why: "Vuelve a 1–2 paradas: entrega fallida al momento (zapatos sin poner, nadie despierto, regalo equivocado)." },
+    recuperacion_cercana: { name: "Recuperación cercana", color: "#7a5af8",
+      why: "Olvido detectado unas paradas después, pero el portador aún estaba cerca." },
+  };
+  const state = { campaign: "nochebuena", year: null, city: "Bilbao", mode: "bringer", showPath: true, view: "city", hidden: new Set(), data: null, cities: [], revisits: null, revisitsKey: "" };
+  const $ = (id) => document.getElementById(id);
+
+  const map = L.map("map", { preferCanvas: true, zoomControl: true }).setView([40.2, -3.0], 6);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, className: "muted-tiles", attribution: "© OpenStreetMap contributors",
+  }).addTo(map);
+  const renderer = L.canvas({ padding: 0.5 });
+  let layer = L.layerGroup().addTo(map);
+
+  async function getJSON(url) {
+    const res = await fetch(url);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.detail || res.statusText);
+    return body;
+  }
+
+  function setSeg(id, value) {
+    document.querySelectorAll(`#${id} button`).forEach((b) => b.classList.toggle("on", b.dataset.v === value));
+  }
+
+  function cityInfo(name) { return state.cities.find((c) => c.city === name); }
+
+  function applyView() {
+    setSeg("viewSeg", state.view);
+    if (state.view === "peninsula") map.setView([40.2, -3.0], 6);
+    else if (state.view === "canarias") map.setView([28.3, -15.8], 8);
+    else {
+      const c = cityInfo(state.city);
+      if (c) map.setView([c.lat, c.lon], 12);
+    }
+  }
+
+  function draw() {
+    layer.clearLayers();
+    const d = state.data;
+    if (!d) return;
+    const feats = d.stops.features.filter((f) => !state.hidden.has(f.properties.route_id));
+    const times = feats.map((f) => Date.parse(f.properties.arrived_at_utc));
+    const tMin = Math.min(...times), tMax = Math.max(...times), span = Math.max(1, tMax - tMin);
+
+    // Paths, one per route in stop order
+    if (state.showPath) {
+      const byRoute = new Map();
+      for (const f of feats) {
+        const k = f.properties.route_id;
+        if (!byRoute.has(k)) byRoute.set(k, []);
+        byRoute.get(k).push(f);
+      }
+      for (const [, fs] of byRoute) {
+        const b = fs[0].properties.bringer;
+        const latlngs = fs.map((f) => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
+        const color = state.mode === "bringer" ? bColor(b) : "#6b7280";
+        const opacity = state.mode === "revisit" ? 0.15 : state.mode === "time" ? 0.25 : 0.4;
+        L.polyline(latlngs, { renderer, color, weight: 1, opacity, interactive: false }).addTo(layer);
+      }
+    }
+
+    // Points
+    const revisits = [];
+    for (const f of feats) {
+      const p = f.properties;
+      const ll = [f.geometry.coordinates[1], f.geometry.coordinates[0]];
+      let style;
+      if (state.mode === "time") {
+        style = { radius: 3, color: rampColor((Date.parse(p.arrived_at_utc) - tMin) / span), fillOpacity: 0.9, weight: 0 };
+      } else if (state.mode === "revisit") {
+        if (p.is_revisit) { if (!state.revisits) revisits.push(f); continue; }
+        style = { radius: 2, color: "#9ca3af", fillOpacity: 0.5, weight: 0 };
+      } else {
+        style = { radius: 3, color: bColor(p.bringer), fillOpacity: 0.8, weight: 0 };
+        if (p.is_revisit) style = { radius: 5, color: "#111", fillColor: bColor(p.bringer), fillOpacity: 1, weight: 1.5 };
+      }
+      L.circleMarker(ll, { renderer, fillColor: style.fillColor || style.color, ...style })
+        .bindTooltip(tooltip(p)).addTo(layer);
+    }
+    for (const f of revisits) {
+      const p = f.properties;
+      const ll = [f.geometry.coordinates[1], f.geometry.coordinates[0]];
+      L.circleMarker(ll, { renderer, radius: 9, color: "#d92d20", weight: 2, fillOpacity: 0 }).addTo(layer);
+      L.circleMarker(ll, { renderer, radius: 4, color: "#d92d20", fillColor: bColor(p.bringer), fillOpacity: 1, weight: 1 })
+        .bindTooltip(tooltip(p)).addTo(layer);
+    }
+    if (state.mode === "revisit" && state.revisits) drawBacktracks();
+    drawLegend(tMin, tMax, d);
+  }
+
+  const btMarkers = new Map();
+  function drawBacktracks() {
+    btMarkers.clear();
+    const ll = (c) => [c[1], c[0]];
+    for (const r of state.revisits.revisits) {
+      if (state.hidden.has(r.route_id)) continue;
+      const cz = CAUSES[r.cause] || CAUSES.recuperacion_cercana;
+      if (r.prev && r.next) L.polyline([ll(r.prev), ll(r.next)], { renderer, color: "#6b7280", weight: 1, dashArray: "2 4", opacity: 0.8, interactive: false }).addTo(layer);
+      const leg = [r.prev, r.point, r.next].filter(Boolean).map(ll);
+      L.polyline(leg, { renderer, color: cz.color, weight: 2.5, opacity: 0.9, dashArray: "6 4", interactive: false }).addTo(layer);
+      const m = L.circleMarker(ll(r.point), { renderer, radius: 4 + Math.min(10, r.detour_km), color: cz.color, weight: 2, fillColor: bColor(r.bringer), fillOpacity: 0.85 })
+        .bindTooltip(btTooltip(r)).addTo(layer);
+      btMarkers.set(`${r.route_id}:${r.stop_number}`, m);
+    }
+  }
+
+  function btTooltip(r) {
+    const cz = CAUSES[r.cause];
+    return `<strong>${r.label}</strong><br>${bName(r.bringer)} · parada ${nf.format(r.stop_number)}`
+      + `<br>Primera visita: parada ${r.orig_stop != null ? nf.format(r.orig_stop) : "—"} (${fmtTime(r.orig_at_utc, r.timezone)})`
+      + `<br>Vuelve ${r.gap_stops ?? "—"} paradas después (${fmtTime(r.arrived_at_utc, r.timezone)}, ${tzLabel(r.timezone)})`
+      + `<br>Desvío: <strong>${nf1.format(r.detour_km)} km</strong> · +${r.dwell_minutes} min en la parada`
+      + `<br><span style="color:${cz.color}"><strong>${cz.name}</strong></span>: ${cz.why}`;
+  }
+
+  function renderDetective() {
+    const el = $("detective");
+    el.classList.toggle("on", state.mode === "revisit");
+    if (state.mode !== "revisit") return;
+    const R = state.revisits;
+    if (!R) { el.innerHTML = `<h2>Detective de regalos olvidados</h2><p class="loading">Analizando revisitas…</p>`; return; }
+    const s = R.summary;
+    const counts = {};
+    for (const r of R.revisits) counts[r.cause] = (counts[r.cause] || 0) + 1;
+    const top = R.revisits.slice(0, 12);
+    el.innerHTML = `<h2>Detective de regalos olvidados</h2>
+      <div class="dsum">
+        <div>Revisitas<b>${nf.format(s.revisits)}</b></div>
+        <div>Km de desvío<b>${nf1.format(s.detour_km)}</b></div>
+        <div>Minutos extra en paradas<b>${nf.format(s.extra_minutes)}</b></div>
+        <div>Vueltas caras (≥ ${nf.format(R.expensive_km)} km)<b>${nf.format(s.expensive)}</b></div>
+      </div>
+      ${Object.entries(CAUSES).map(([k, c]) => `<div class="cause"><span class="sw" style="background:${c.color};margin-top:3px"></span><div><strong>${c.name}</strong> · ${nf.format(counts[k] || 0)}<small>${c.why}</small></div></div>`).join("")}
+      <p class="note">Causas probables (hipótesis): los datos no registran el motivo de la revisita.</p>
+      <h2 style="margin-top:.7rem">Desvíos más caros</h2>
+      ${top.length ? top.map((r, i) => `<div class="bt" data-k="${r.route_id}:${r.stop_number}">
+          <span class="n">${i + 1}</span>
+          <span>${r.label}<small>${bName(r.bringer)} · parada ${nf.format(r.stop_number)} · vuelve ${r.gap_stops ?? "—"} paradas después</small></span>
+          <strong style="color:${CAUSES[r.cause].color}">${nf1.format(r.detour_km)} km</strong></div>`).join("") : "<p>Sin revisitas en esta ruta.</p>"}`;
+    el.querySelectorAll(".bt").forEach((row) => row.addEventListener("click", () => {
+      const m = btMarkers.get(row.dataset.k);
+      if (m) { map.setView(m.getLatLng(), 15); m.openTooltip(); }
+    }));
+  }
+
+  async function ensureRevisits() {
+    const key = `${state.year}|${state.campaign}|${state.city}`;
+    if (state.revisits && state.revisitsKey === key) return;
+    state.revisits = null;
+    state.revisitsKey = key;
+    renderDetective();
+    try {
+      const q = new URLSearchParams({ year: state.year, campaign: state.campaign, city: state.city });
+      const data = await getJSON(`/api/revisits?${q}`);
+      if (state.revisitsKey !== key) return;
+      state.revisits = data;
+    } catch (err) {
+      $("status").textContent = `No se pudieron cargar las revisitas: ${err.message}`;
+    }
+    renderDetective();
+    draw();
+  }
+
+  function tooltip(p) {
+    return `<strong>${p.label}</strong><br>${bName(p.bringer)} · parada ${nf.format(p.stop_number)}`
+      + `<br>Llegada: ${fmtTime(p.arrived_at_utc, p.timezone)} (${tzLabel(p.timezone)})`
+      + `<br>${nf.format(p.household_size)} personas · ${p.dwell_minutes} min`
+      + (p.is_revisit ? `<br><strong style="color:#d92d20">Revisita: hogar ya visitado en esta ruta</strong>` : "");
+  }
+
+  function drawLegend(tMin, tMax, d) {
+    const tz = (d.routes[0] || {}).timezone || "Europe/Madrid";
+    let html = "";
+    if (state.mode === "time" && isFinite(tMin)) {
+      html = `<strong>Hora de llegada</strong> <span style="color:#6b7280">(${tzLabel(tz)})</span>`
+        + `<div class="ramp" style="background:linear-gradient(90deg, ${RAMP.join(",")})"></div>`
+        + `<div class="ramp-l"><span>${fmtTime(new Date(tMin).toISOString(), tz)}</span><span>${fmtTime(new Date((tMin + tMax) / 2).toISOString(), tz)}</span><span>${fmtTime(new Date(tMax).toISOString(), tz)}</span></div>`;
+    } else if (state.mode === "revisit") {
+      html = `<strong>Revisitas</strong>`
+        + `<div style="margin-top:.35rem;display:flex;gap:.4rem;align-items:center"><span style="width:22px;border-top:2.5px dashed #d92d20"></span> Desvío: parada anterior → hogar revisitado → parada siguiente</div>`
+        + `<div style="margin-top:.25rem;display:flex;gap:.4rem;align-items:center"><span style="width:22px;border-top:1px dotted #6b7280"></span> Trayecto directo que se habría hecho</div>`
+        + `<div style="margin-top:.25rem;display:flex;gap:.4rem;align-items:center"><span class="sw" style="border:2px solid #d92d20;background:#fff"></span> Tamaño del círculo = km de desvío</div>`
+        + `<div style="margin-top:.25rem;display:flex;gap:.4rem;align-items:center"><span class="sw" style="background:#9ca3af"></span> Resto de paradas</div>`;
+    } else {
+      html = `<strong>Portador</strong>` + d.routes.map((r) =>
+        `<div style="margin-top:.3rem;display:flex;gap:.4rem;align-items:center"><span class="sw" style="background:${bColor(r.bringer)}"></span>${bName(r.bringer)}</div>`).join("")
+        + `<div style="margin-top:.3rem;display:flex;gap:.4rem;align-items:center"><span class="sw" style="background:#fff;border:1.5px solid #111"></span>Revisita</div>`;
+    }
+    $("legend").innerHTML = html;
+  }
+
+  function renderRoutes() {
+    const d = state.data;
+    const totalStops = d.routes.reduce((s, r) => s + r.stops, 0);
+    $("routes").innerHTML = d.routes.length ? d.routes.map((r) => {
+      const share = totalStops ? Math.round((100 * r.stops) / totalStops) : 0;
+      const checked = state.hidden.has(r.route_id) ? "" : "checked";
+      return `<div class="route">
+        <label class="t"><input type="checkbox" data-route="${r.route_id}" ${checked} /><span class="sw" style="background:${bColor(r.bringer)}"></span>${bName(r.bringer)} <span style="color:#9ca3af;font-weight:400">ruta ${r.route_id}</span></label>
+        <dl>
+          <dt>Paradas</dt><dd>${nf.format(r.stops)} (${share}%)</dd>
+          <dt>Km recorridos</dt><dd>${nf.format(Math.round(r.km))}</dd>
+          <dt>Km por parada</dt><dd>${nf1.format(r.km / Math.max(1, r.stops - 1))}</dd>
+          <dt>Salto más largo</dt><dd>${nf1.format(r.max_hop_km)} km</dd>
+          <dt>Revisitas</dt><dd>${nf.format(r.revisits)}</dd>
+          <dt>Horario</dt><dd>${fmtTime(r.first_at_utc, r.timezone)} – ${fmtTime(r.last_at_utc, r.timezone)}</dd>
+          <dt>Esfuerzo en paradas</dt><dd>${nf.format(Math.round(r.dwell_minutes / 60))} h</dd>
+        </dl></div>`;
+    }).join("") : `<p>No hay rutas de esta noche en ${state.city}.</p>`;
+    document.querySelectorAll("#routes input[data-route]").forEach((el) => el.addEventListener("change", () => {
+      const id = Number(el.dataset.route);
+      el.checked ? state.hidden.delete(id) : state.hidden.add(id);
+      draw();
+    }));
+  }
+
+  function renderKpis() {
+    const rs = state.data.routes;
+    const sum = (k) => rs.reduce((s, r) => s + r[k], 0);
+    const tz = (rs[0] || {}).timezone || "Europe/Madrid";
+    const first = rs.map((r) => r.first_at_utc).sort()[0];
+    const last = rs.map((r) => r.last_at_utc).sort().slice(-1)[0];
+    $("kHog").textContent = nf.format(sum("households"));
+    $("kPar").textContent = nf.format(sum("stops"));
+    $("kKm").textContent = nf.format(Math.round(sum("km")));
+    $("kRev").textContent = nf.format(sum("revisits"));
+    $("kIni").textContent = first ? fmtDateTime(first, tz) : "—";
+    $("kFin").textContent = last ? fmtDateTime(last, tz) : "—";
+    $("kTz1").textContent = $("kTz2").textContent = tzLabel(tz);
+    const k = Math.max(1, Math.ceil(Math.max(0, ...rs.map((r) => r.stops)) / state.data.sample_per_route));
+    $("note").textContent = k > 1
+      ? `Mapa muestreado: 1 de cada ${nf.format(k)} paradas aprox. (máx. ${nf.format(state.data.sample_per_route)} por ruta). Las revisitas se muestran siempre. Los indicadores usan todas las paradas.`
+      : "Se muestran todas las paradas.";
+  }
+
+  function renderTitle() {
+    const night = state.campaign === "nochebuena" ? `Nochebuena ${state.year}` : `Noche de Reyes ${state.year}–${state.year + 1}`;
+    $("title").textContent = `Mapa de rutas — ${night}`;
+    const c = cityInfo(state.city);
+    $("subtitle").textContent = c ? `${state.city} · ${c.autonomous_community}` : state.city;
+  }
+
+  async function load() {
+    renderTitle();
+    setSeg("citySeg", state.city);
+    $("city").value = state.city;
+    $("status").textContent = "";
+    state.revisits = null; state.revisitsKey = "";
+    renderDetective();
+    $("routes").innerHTML = `<p class="loading">Cargando rutas de ${state.city}…</p>`;
+    try {
+      const q = new URLSearchParams({ year: state.year, campaign: state.campaign, city: state.city });
+      state.data = await getJSON(`/api/route?${q}`);
+      state.hidden.clear();
+      renderKpis(); renderRoutes(); draw();
+      if (state.mode === "revisit") ensureRevisits();
+    } catch (err) {
+      $("status").textContent = `No se pudieron cargar las rutas: ${err.message}`;
+      $("routes").innerHTML = "";
+    }
+  }
+
+  function bindSeg(id, fn) {
+    document.querySelectorAll(`#${id} button`).forEach((b) => b.addEventListener("click", () => fn(b.dataset.v)));
+  }
+  bindSeg("campaignSeg", (v) => { state.campaign = v; setSeg("campaignSeg", v); load(); });
+  bindSeg("citySeg", (v) => selectCity(v));
+  bindSeg("modeSeg", (v) => {
+    state.mode = v; setSeg("modeSeg", v); renderDetective(); draw();
+    if (v === "revisit" && state.data) ensureRevisits();
+  });
+  bindSeg("viewSeg", (v) => { state.view = v; applyView(); });
+  $("showPath").addEventListener("change", (e) => { state.showPath = e.target.checked; draw(); });
+  $("year").addEventListener("change", (e) => { state.year = Number(e.target.value); load(); });
+  $("city").addEventListener("change", (e) => selectCity(e.target.value));
+
+  function selectCity(name) {
+    state.city = name;
+    state.view = "city";
+    applyView();
+    load();
+  }
+
+  (async () => {
+    try {
+      const opts = await getJSON("/api/route/options");
+      state.cities = opts.cities;
+      state.year = opts.years[opts.years.length - 1];
+      $("year").innerHTML = opts.years.slice().reverse().map((y) => `<option value="${y}">${y}</option>`).join("");
+      $("city").innerHTML = opts.cities.map((c) =>
+        `<option value="${c.city}">${c.city} (${nf.format(c.households)} hogares)</option>`).join("");
+      selectCity(state.city);
+    } catch (err) {
+      $("status").textContent = `No se pudieron cargar las opciones: ${err.message}`;
+    }
+  })();
+})();
+</script>
+<script src="/static/navidad-fx.js" defer></script>
+</body>
+</html>

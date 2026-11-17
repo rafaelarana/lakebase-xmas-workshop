@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+.DS_Store
+navidad-hack-infra/copied-apps/
+dist/
+.pytest_cache/

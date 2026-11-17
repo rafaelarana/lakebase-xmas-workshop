@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Taller de Navidad</title>
+    <link rel="stylesheet" href="/static/navidad-fx.css" />
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        margin: 1.5rem;
+        max-width: 52rem;
+      }
+      h1 {
+        font-size: 1.4rem;
+      }
+      section {
+        margin: 1.25rem 0;
+        padding: 0.75rem 0;
+        border-top: 1px solid #ddd;
+      }
+      button {
+        margin-right: 0.5rem;
+      }
+      pre {
+        background: #f6f6f6;
+        padding: 0.75rem;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+      table {
+        border-collapse: collapse;
+        margin-top: 0.5rem;
+      }
+      th,
+      td {
+        border: 1px solid #ccc;
+        padding: 0.25rem 0.5rem;
+        text-align: left;
+      }
+    </style>
+  <link rel="stylesheet" href="/static/nav.css" />
+</head>
+  <body>
+<script src="/static/nav.js"></script>
+    <!-- Christmas header effects (decorative, static/navidad-fx.*). Disable by default with <html data-navidad-fx="off">. -->
+    <header class="navidad-header" data-navidad-header>
+      <span class="navidad-brand">
+        <span class="navidad-logo" data-navidad-logo>
+          <img src="/static/databricks-symbol.svg" alt="Databricks" />
+        </span>
+        Taller de Navidad
+      </span>
+    </header>
+    <div id="root"></div>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@18.3.1",
+          "react-dom/client": "https://esm.sh/react-dom@18.3.1/client"
+        }
+      }
+    </script>
+    <script type="module">
+      import React, { useState } from "react";
+      import { createRoot } from "react-dom/client";
+
+      const { useCallback } = React;
+
+      function jsonOrText(res) {
+        const ct = res.headers.get("content-type") || "";
+        const parse = ct.includes("application/json") ? res.json() : res.text();
+        return parse.then((body) => {
+          if (!res.ok) {
+            const detail =
+              typeof body === "object" && body && (body.detail || body.error || JSON.stringify(body));
+            throw new Error(typeof body === "string" ? body : String(detail || res.statusText));
+          }
+          return body;
+        });
+      }
+
+      const nf = new Intl.NumberFormat("es-ES");
+      const formatCell = (v) => (typeof v === "number" ? nf.format(v) : String(v));
+
+      function Table({ rows }) {
+        if (!rows || !rows.length) return React.createElement("p", null, "Sin filas");
+        const cols = Object.keys(rows[0]);
+        return React.createElement(
+          "table",
+          null,
+          React.createElement(
+            "thead",
+            null,
+            React.createElement(
+              "tr",
+              null,
+              cols.map((c) => React.createElement("th", { key: c }, c))
+            )
+          ),
+          React.createElement(
+            "tbody",
+            null,
+            rows.map((row, i) =>
+              React.createElement(
+                "tr",
+                { key: i },
+                cols.map((c) => React.createElement("td", { key: c }, formatCell(row[c])))
+              )
+            )
+          )
+        );
+      }
+
+      function App() {
+        const [health, setHealth] = useState("");
+        const [sample, setSample] = useState(null);
+        const [sampleErr, setSampleErr] = useState("");
+        const [model, setModel] = useState("");
+        const [busy, setBusy] = useState("");
+
+        const pingHealth = useCallback(async () => {
+          setBusy("health");
+          try {
+            const data = await fetch("/health").then(jsonOrText);
+            setHealth(JSON.stringify(data));
+          } catch (err) {
+            setHealth(String(err));
+          } finally {
+            setBusy("");
+          }
+        }, []);
+
+        const loadSample = useCallback(async () => {
+          setBusy("sample");
+          setSampleErr("");
+          try {
+            const data = await fetch("/api/sample-households").then(jsonOrText);
+            setSample(data.rows || data);
+          } catch (err) {
+            setSampleErr(String(err));
+          } finally {
+            setBusy("");
+          }
+        }, []);
+
+        const pingModel = useCallback(async () => {
+          setBusy("model");
+          try {
+            const data = await fetch("/api/model-ping", { method: "POST" }).then(jsonOrText);
+            setModel(typeof data === "string" ? data : data.text || JSON.stringify(data));
+          } catch (err) {
+            setModel(String(err));
+          } finally {
+            setBusy("");
+          }
+        }, []);
+
+        return React.createElement(
+          "main",
+          null,
+          React.createElement("h1", null, "Taller de Navidad — Papá Noel y Reyes Magos"),
+          React.createElement(
+            "section",
+            { "aria-label": "Estado" },
+            React.createElement("h2", null, "Estado"),
+            React.createElement(
+              "button",
+              { type: "button", onClick: pingHealth, disabled: busy === "health" },
+              "Comprobar estado"
+            ),
+            health ? React.createElement("pre", null, health) : null
+          ),
+          React.createElement(
+            "section",
+            { "aria-label": "Hogares por ciudad" },
+            React.createElement("h2", null, "Hogares por ciudad"),
+            React.createElement(
+              "button",
+              { type: "button", onClick: loadSample, disabled: busy === "sample" },
+              "Cargar muestra"
+            ),
+            sampleErr ? React.createElement("pre", null, sampleErr) : null,
+            Array.isArray(sample) ? React.createElement(Table, { rows: sample }) : null
+          ),
+          React.createElement(
+            "section",
+            { "aria-label": "Modelo" },
+            React.createElement("h2", null, "Modelo"),
+            React.createElement(
+              "button",
+              { type: "button", onClick: pingModel, disabled: busy === "model" },
+              "Probar modelo"
+            ),
+            model ? React.createElement("pre", null, model) : null
+          )
+        );
+      }
+
+      createRoot(document.getElementById("root")).render(React.createElement(App));
+    </script>
+    <script src="/static/navidad-fx.js" defer></script>
+  </body>
+</html>

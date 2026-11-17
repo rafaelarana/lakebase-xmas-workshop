@@ -1,0 +1,219 @@
+/*
+ * Navidad header effects: snowfall, tree + snowman scene, Santa hat on the logo,
+ * Santa's sleigh with reindeer and shooting stars. Purely decorative: every layer
+ * is aria-hidden and pointer-events: none. Driven by navidad-fx.js.
+ * Opt out: <html data-navidad-fx="off">, the header toggle, or prefers-reduced-motion.
+ */
+:root {
+  --color-holiday-snow: #9fb3c2;
+  --color-holiday-red: #c8102e;
+  --color-holiday-fur: #fff;
+  --color-holiday-fur-edge: #8a9ba4;
+  --color-holiday-fur-shade: #d7e1e7;
+  --color-holiday-pine: #2f6f57;
+  --color-holiday-pine-back: #6f9c89;
+  --color-holiday-trunk: #7a5136;
+  --color-holiday-coal: #1b3139;
+  --color-holiday-carrot: #ef7d2b;
+  --color-holiday-gold: #f2b632;
+  --color-holiday-cheek: #f4a3a8;
+  --color-holiday-tree-snow: #eef4f8;
+  --color-holiday-tree-snow-edge: #a9bcc7;
+  --color-holiday-reindeer: #8a5a3b;
+  --color-holiday-skin: #f3cfb3;
+  --color-holiday-sparkle: #ffd86b;
+  --color-holiday-mini-hill: #e3eaee;
+}
+
+/* Header pill */
+.navidad-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  height: 3rem;
+  padding: 0 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid #e3e7ea;
+  border-radius: 40px;
+  background: #fff;
+  box-shadow: 0 4px 6px -1px #0000001a, 0 2px 4px -2px #0000001a;
+  flex-wrap: nowrap;
+}
+/* Keep any header content (title, links) painted above the effects layer. */
+.navidad-header > * {
+  position: relative;
+}
+.navidad-header h1 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.navidad-brand {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.navidad-logo {
+  position: relative;
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+.navidad-logo > img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+.navidad-hat {
+  position: absolute;
+  top: -12px;
+  left: 4.94px;
+  width: 18.35px;
+  height: 14.12px;
+  overflow: visible;
+  pointer-events: none;
+}
+.navidad-fx-toggle {
+  position: relative;
+  margin-left: auto;
+  margin-right: 0;
+  border: 1px solid #d5dbe0;
+  border-radius: 999px;
+  background: #fff;
+  padding: 0.2rem 0.65rem;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+/* Overlay layers */
+.navidad-fx-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 40px;
+  pointer-events: none;
+}
+.navidad-scene {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 50%;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+}
+.navidad-scene .hill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: block;
+  width: 100%;
+  height: 9px;
+}
+.navidad-scene .prop {
+  position: absolute;
+  bottom: 3px;
+  transform: translateX(-50%);
+}
+.navidad-scene svg {
+  display: block;
+  overflow: visible;
+}
+.snowfall,
+.sky-events {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.snowflake-contained {
+  position: absolute;
+  top: 0;
+  display: block;
+  height: 100%;
+  animation-name: snow-fall-contained;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.snowflake-sway {
+  display: block;
+  border-radius: 999px;
+  background: var(--color-holiday-snow);
+  animation-name: snow-sway;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+.santa-flight {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  right: 0;
+  animation: santa-fly 7s linear forwards;
+}
+.santa-bob {
+  width: max-content;
+  animation: santa-bob 0.9s ease-in-out infinite alternate;
+}
+.santa-bob svg {
+  display: block;
+  overflow: visible;
+}
+.sleigh-sparkle {
+  transform-box: fill-box;
+  transform-origin: 50% center;
+  animation: sleigh-sparkle 0.7s ease-in-out infinite alternate;
+}
+.shooting-star {
+  position: absolute;
+  top: 6px;
+  width: 64px;
+  height: 2px;
+  border-radius: 2px;
+  opacity: 0;
+  background: linear-gradient(to right, var(--color-holiday-gold), transparent);
+  animation: shooting-star 1.1s ease-out forwards;
+}
+
+@keyframes snow-fall-contained {
+  0% { transform: translateY(-10%); }
+  100% { transform: translateY(110%); }
+}
+@keyframes snow-sway {
+  0% { transform: translate(-12px); }
+  100% { transform: translate(12px); }
+}
+@keyframes santa-fly {
+  0% { transform: translate(-150px); }
+  100% { transform: translate(100%); }
+}
+@keyframes santa-bob {
+  0% { transform: translateY(0) rotate(-2deg); }
+  100% { transform: translateY(-3px) rotate(1deg); }
+}
+@keyframes sleigh-sparkle {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0.25; transform: scale(0.55); }
+}
+@keyframes shooting-star {
+  0% { opacity: 0; transform: translate(0) rotate(-7deg); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-240px, 28px) rotate(-7deg); }
+}
+
+@media (max-width: 640px) {
+  .navidad-scene { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .snowfall,
+  .sky-events { display: none; }
+  .sleigh-sparkle { animation: none; }
+}

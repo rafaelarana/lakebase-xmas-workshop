@@ -1,0 +1,31 @@
+/* Search bar (Lakebase Search) — static/search.js puts it in the page header */
+.nsearch { position: relative; margin-left: auto; margin-right: 0.5rem; width: min(380px, 40vw); z-index: 2600; }
+.nsearch input { width: 100%; padding: 0.42rem 0.7rem 0.42rem 2rem; border: 1px solid #d6d0c6; border-radius: 999px; background: #fff;
+  font: 500 0.86rem system-ui, sans-serif; color: #1f2933; }
+.nsearch input:focus { outline: 2px solid #ff362155; border-color: #ff3621; }
+.nsearch svg.ico { position: absolute; left: 0.65rem; top: 50%; width: 15px; height: 15px; transform: translateY(-50%); stroke: #6b7280; fill: none; stroke-width: 2; }
+.nsearch .dd { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: #fff; border: 1px solid #e3ded6; border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.14); overflow: hidden; display: none; }
+.nsearch .dd.on { display: block; }
+.nsearch .it { display: grid; grid-template-columns: 22px 1fr; gap: 0.5rem; padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.84rem; align-items: start; }
+.nsearch .it:hover, .nsearch .it.sel { background: #f7f5f1; }
+.nsearch .it b { display: block; color: #1f2933; } .nsearch .it small { color: #6b7280; }
+.nsearch .it .k { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; }
+.nsearch .k.familia { background: #fdecea; } .nsearch .k.duende { background: #e8f5ee; } .nsearch .k.paje { background: #efe9fb; }
+.nsearch .hd { padding: 0.45rem 0.75rem; font-size: 0.72rem; color: #6b7280; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid #f0ece6; }
+.nsearch .ft { padding: 0.35rem 0.75rem; font-size: 0.72rem; color: #9ca3af; border-top: 1px solid #f0ece6; }
+.nsearch .chips { display: flex; flex-wrap: wrap; gap: 0.35rem; padding: 0.55rem 0.75rem 0.65rem; }
+.nsearch .chips button { border: 1px solid #e3ded6; background: #faf8f4; border-radius: 999px; padding: 0.22rem 0.6rem; font-size: 0.78rem; cursor: pointer; }
+.nsearch .chips button:hover { border-color: #ff3621; }
+.ncard { position: fixed; z-index: 2400; left: calc(var(--rail-w, 0px) + 24px); top: 120px; width: min(420px, 90vw); max-height: calc(100vh - 150px); overflow: auto;
+  background: #fff; border: 1px solid #e3ded6; border-radius: 12px; box-shadow: 0 14px 34px rgba(0,0,0,.16); font: 0.84rem system-ui, sans-serif; color: #1f2933; }
+.ncard header { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.7rem 0.85rem 0.5rem; border-bottom: 1px solid #f0ece6; margin: 0 !important; }
+.ncard header b { font-size: 0.98rem; } .ncard header small { display: block; color: #6b7280; font-weight: 400; }
+.ncard header button { border: 0; background: none; font-size: 1.1rem; cursor: pointer; color: #6b7280; align-self: start; }
+.ncard section { padding: 0.55rem 0.85rem; } .ncard h4 { margin: 0.2rem 0 0.35rem; font-size: 0.78rem; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; }
+.ncard table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.ncard td, .ncard th { padding: 0.25rem 0.3rem; border-bottom: 1px solid #f3efe9; text-align: left; } .ncard th { color: #6b7280; font-weight: 500; }
+.ncard .pill { display: inline-block; padding: 0.05rem 0.45rem; border-radius: 999px; background: #f1efe9; font-size: 0.74rem; margin: 0 0.2rem 0.2rem 0; }
+.ncard .live { background: #e8f5ee; color: #1f8f5f; border-radius: 8px; padding: 0.35rem 0.5rem; margin-top: 0.4rem; }
+.ncard .eng { color: #9ca3af; font-size: 0.72rem; padding: 0 0.85rem 0.6rem; }
+@media (max-width: 700px) { .nsearch { width: 100%; margin: 0.4rem 0 0; } }
